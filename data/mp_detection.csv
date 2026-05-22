@@ -1,0 +1,25 @@
+"YEAR","DETECTION_METHOD","OFFENSES_SUM (Sum)","FINES (Sum)","ARRESTS (Sum)","CHARGES (Sum)"
+2008,"Police issued",155999,155999,0,0
+2009,"Police issued",165252,165252,0,0
+2010,"Police issued",171829,171829,0,0
+2011,"Police issued",159874,159874,0,0
+2012,"Police issued",166975,166975,0,0
+2013,"Police issued",146415,146415,0,0
+2014,"Police issued",132619,132619,0,0
+2015,"Police issued",128385,128385,0,0
+2016,"Police issued",114981,114981,0,0
+2017,"Police issued",117909,117909,0,0
+2018,"Police issued",113981,113981,0,0
+2019,"Police issued",97367,97367,0,0
+2020,"Camera",138847,138847,0,0
+2020,"Police issued",56304,56304,0,0
+2021,"Camera",178296,178296,0,0
+2021,"Police issued",42784,42784,0,0
+2022,"Camera",312945,312945,0,0
+2022,"Police issued",49397,49397,0,0
+2023,"Camera",311563,311563,0,0
+2023,"Police issued",46842,46599,5,238
+2023,"Unknown",164,0,7,157
+2024,"Camera",289995,289995,0,0
+2024,"Police issued",41198,40931,3,264
+2024,"Unknown",207,0,4,203

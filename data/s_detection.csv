@@ -1,0 +1,19 @@
+"YEAR","DETECTION_METHOD","OFFENSES_SUM (Sum)","FINES (Sum)","ARRESTS (Sum)","CHARGES (Sum)"
+2017,"Camera",28,28,0,0
+2017,"Police issued",30235,30235,0,0
+2018,"Camera",15,15,0,0
+2018,"Police issued",57539,57539,0,0
+2019,"Camera",7,7,0,0
+2019,"Police issued",52742,52742,0,0
+2020,"Camera",5,5,0,0
+2020,"Police issued",35905,35905,0,0
+2021,"Camera",5351,5351,0,0
+2021,"Police issued",27842,27842,0,0
+2022,"Camera",52081,52081,0,0
+2022,"Police issued",28389,28389,0,0
+2023,"Camera",58072,58072,0,0
+2023,"Police issued",28408,27696,47,665
+2023,"Unknown",366,0,19,347
+2024,"Camera",160659,160659,0,0
+2024,"Police issued",23905,22655,63,1187
+2024,"Unknown",407,1,23,383
