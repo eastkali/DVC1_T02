@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Police Enforcement Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+
+    <header class="dashboard-header">
+        <div class="header-inner">
+            <h1>Police Enforcement Dashboard</h1>
+            <nav class="main-menu" id="topic-menu">
+                <button class="nav-btn active" data-topic="home">Home</button>
+                <button class="nav-btn" data-topic="s">Seatbelts</button>
+                <button class="nav-btn" data-topic="mp">Mobile Phone</button>
+            </nav>
+        </div>
+    </header>
+
+    <div class="main-content">
+        
+        <section id="home-view" class="view-section">
+            <h2>Welcome to the Police Enforcement Dashboard</h2>
+        </section>
+
+        <div id="dashboard-view" class="view-section" style="display: none;">
+            
+            <section class="filters-container">
+                <div class="filter-group"><label>Jurisdiction</label><select id="filter-jurisdiction" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Location</label><select id="filter-location" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Years</label><select id="filter-year" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Age Group</label><select id="filter-age" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Method</label><select id="filter-method" class="chart-filter"></select></div>
+                <button id="reset-view-btn" class="reset-btn">Reset View</button>
+            </section>
+
+            <main class="dashboard-grid" id="dashboard-grid"></main>
+        </div>
+
+    </div>
+
+    <div id="chart-modal" class="modal">
+        <div class="modal-content">
+            <span class="close-modal" id="close-modal-btn">&times;</span>
+            <h2 id="modal-title">Enlarged Chart View</h2>
+            <div id="modal-chart-container" class="canvas-container"></div>
+        </div>
+    </div>
+
+    <script src="js/yearChart.js"></script>
+    <script src="js/locationChart.js"></script>
+    <script src="js/ageGroupChart.js"></script>
+    
+    <script src="js/app.js"></script>
+</body>
+</html>
