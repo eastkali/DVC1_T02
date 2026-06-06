@@ -1,182 +1,267 @@
-let currentTopic = ''; 
-let rawDatasets = {};
-let activeChartInstances = {};
+window.currentTopic = ''; 
+window.rawDatasets = {};
 
-window.okabeItoColors = ['#56B4E9', '#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442'];
-window.pointShapes = ['circle', 'rect', 'triangle', 'rectRot', 'star', 'cross', 'dash'];
+window.okabeItoColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
+window.pointShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot'];
 
-const chartConfigs = [
-    { id: 'year', title: 'Violations by Year', type: 'bar' },
-    { id: 'location', title: 'Violations by Location', type: 'pie' },
-    { id: 'age', title: 'Age Group Distribution', type: 'bar' },
-    { id: 'method', title: 'Method of Detection', type: 'doughnut' },
-    { id: 'jurisdiction', title: 'Jurisdiction Comparison', type: 'bar' },
-    { id: 'trend', title: 'Trend Over Time', type: 'line' }
-];
-
-function buildDashboardGrid() {
-    const grid = document.getElementById("dashboard-grid");
-    if(!grid) return;
-    grid.innerHTML = ''; 
-
-    chartConfigs.forEach(conf => {
-        grid.innerHTML += `
-            <div class="chart-card">
-                <div class="chart-header">
-                    <h3>${conf.title}</h3>
-                    <button class="enlarge-btn" onclick="openModal('${conf.id}')">&#x2922;</button>
-                </div>
-                <div class="canvas-container">
-                    <canvas id="chart-${conf.id}"></canvas>
-                </div>
-            </div>
-        `;
-    });
+if (typeof Chart !== 'undefined') {
+    Chart.defaults.plugins.legend.labels.usePointStyle = true;
+    Chart.defaults.plugins.legend.labels.boxWidth = 12; 
 }
+
+window.checkDataAndToggle = function(chartId, data) {
+    const canvas = document.getElementById(chartId);
+    if (!canvas) return false;
+    
+    const container = canvas.parentElement;
+    let noDataMsg = container.querySelector('.no-data-overlay');
+    
+    if (!noDataMsg) {
+        noDataMsg = document.createElement('div');
+        noDataMsg.className = 'no-data-overlay';
+        noDataMsg.style.position = 'absolute';
+        noDataMsg.style.top = '0';
+        noDataMsg.style.left = '0';
+        noDataMsg.style.width = '100%';
+        noDataMsg.style.height = '100%';
+        noDataMsg.style.display = 'flex';
+        noDataMsg.style.justifyContent = 'center';
+        noDataMsg.style.alignItems = 'center';
+        noDataMsg.style.background = '#ffffff'; 
+        noDataMsg.style.color = '#64748b';
+        noDataMsg.style.fontWeight = 'bold';
+        noDataMsg.style.fontSize = '14px';
+        noDataMsg.style.zIndex = '10';
+        noDataMsg.style.textAlign = 'center';
+        noDataMsg.style.padding = '20px';
+        noDataMsg.style.boxSizing = 'border-box';
+        noDataMsg.innerText = 'No data available for the selected filters.';
+        container.appendChild(noDataMsg);
+    }
+
+    if (!data || data.length === 0) {
+        noDataMsg.style.display = 'flex';
+        canvas.style.display = 'none'; 
+        if (typeof Chart !== 'undefined') {
+            const existingChart = Chart.getChart(chartId);
+            if (existingChart) existingChart.destroy();
+        }
+        return false;
+    } else {
+        noDataMsg.style.display = 'none';
+        canvas.style.display = 'block';
+        return true;
+    }
+};
+
+document.addEventListener('click', () => {
+    document.querySelectorAll('.dropdown-list').forEach(list => {
+        list.style.display = 'none';
+    });
+});
+
+window.toggleDatasetHighlight = function(chart, datasetIndex) {
+    if (!chart || !chart.data || !chart.data.datasets || chart.data.datasets.length <= 1) return;
+
+    if (chart._highlightedIndex === datasetIndex) datasetIndex = null;
+    chart._highlightedIndex = datasetIndex;
+
+    chart.data.datasets.forEach((dataset, idx) => {
+        if (dataset._origBorderColor === undefined) dataset._origBorderColor = dataset.borderColor;
+        if (dataset._origBgColor === undefined) dataset._origBgColor = dataset.backgroundColor;
+        if (dataset._origPointBgColor === undefined) dataset._origPointBgColor = dataset.pointBackgroundColor || dataset.backgroundColor;
+        if (dataset._origPointBorderColor === undefined) dataset._origPointBorderColor = dataset.pointBorderColor || dataset.borderColor;
+
+        if (datasetIndex === null || idx === datasetIndex) {
+            dataset.borderColor = dataset._origBorderColor;
+            dataset.backgroundColor = dataset._origBgColor;
+            dataset.pointBackgroundColor = dataset._origPointBgColor;
+            dataset.pointBorderColor = dataset._origPointBorderColor;
+        } else {
+            dataset.borderColor = 'rgba(200, 200, 200, 1)'; 
+            dataset.backgroundColor = 'rgba(200, 200, 200, 0.25)';
+            dataset.pointBackgroundColor = 'rgba(200, 200, 200, 1)';
+            dataset.pointBorderColor = 'rgba(200, 200, 200, 1)';
+        }
+    });
+    chart.update();
+};
+
+window.enforceInteractiveHighlight = function() {
+    if (typeof Chart === 'undefined') return;
+    Object.values(Chart.instances).forEach(chart => {
+        if (chart.data && chart.data.datasets && chart.data.datasets.length > 1) {
+            if (chart.options.plugins && chart.options.plugins.legend) {
+                chart.options.plugins.legend.onClick = function(e, legendItem, legend) {
+                    window.toggleDatasetHighlight(legend.chart, legendItem.datasetIndex);
+                };
+            }
+            chart.options.onClick = function(e, elements, chartInstance) {
+                const activeElements = chartInstance.getElementsAtEventForMode(e, 'nearest', { intersect: false }, true);
+                if (activeElements && activeElements.length > 0) {
+                    window.toggleDatasetHighlight(chartInstance, activeElements[0].datasetIndex);
+                } else {
+                    window.toggleDatasetHighlight(chartInstance, null); 
+                }
+            };
+        }
+    });
+};
 
 window.getActiveFilters = function() {
-    return {
-        year: document.getElementById('filter-year') ? document.getElementById('filter-year').value : 'all',
-        jurisdiction: document.getElementById('filter-jurisdiction') ? document.getElementById('filter-jurisdiction').value : 'all',
-        location: document.getElementById('filter-location') ? document.getElementById('filter-location').value : 'all',
-        age: document.getElementById('filter-age') ? document.getElementById('filter-age').value : 'all',
-        method: document.getElementById('filter-method') ? document.getElementById('filter-method').value : 'all'
-    };
-}
+    function getSelectedValues(id) {
+        const el = document.getElementById(id);
+        if (!el) return ['all'];
+        
+        const allCheckbox = el.querySelector('.filter-checkbox-all');
+        if (allCheckbox && allCheckbox.checked) return ['all'];
 
-function loadTopicData(topic) {
+        const checkboxes = el.querySelectorAll('.filter-checkbox-item:checked');
+        const values = Array.from(checkboxes).map(cb => cb.value);
+        
+        return values.length === 0 ? ['all'] : values;
+    }
+
+    return {
+        year: getSelectedValues('filter-year'),
+        jurisdiction: getSelectedValues('filter-jurisdiction'),
+        location: getSelectedValues('filter-location'),
+        age: getSelectedValues('filter-age'),
+        method: getSelectedValues('filter-method')
+    };
+};
+
+window.getFilteredData = function(dataArray, filters) {
+    if (!dataArray || !Array.isArray(dataArray)) return dataArray;
+    
+    return dataArray.filter(row => {
+        const keys = Object.keys(row);
+        
+        const yearKey = keys.find(k => k.toLowerCase() === 'year');
+        const jurisKey = keys.find(k => k.toLowerCase() === 'jurisdiction');
+        const locKey = keys.find(k => k.toLowerCase() === 'location');
+        const ageKey = keys.find(k => k.toLowerCase().includes('age'));
+        const methodKey = keys.find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
+
+        // STRICT FILTERING: Hide data if the column doesn't exist to prevent fake totals
+        if (filters.year && !filters.year.includes('all')) {
+            if (!yearKey || !filters.year.includes(row[yearKey].toString().trim())) return false;
+        }
+        if (filters.jurisdiction && !filters.jurisdiction.includes('all')) {
+            if (!jurisKey || !filters.jurisdiction.includes(row[jurisKey].toString().trim())) return false;
+        }
+        if (filters.location && !filters.location.includes('all')) {
+            if (!locKey || !filters.location.includes(row[locKey].toString().trim())) return false;
+        }
+        if (filters.age && !filters.age.includes('all')) {
+            if (!ageKey || !filters.age.includes(row[ageKey].toString().trim())) return false;
+        }
+        if (filters.method && !filters.method.includes('all')) {
+            if (!methodKey || !filters.method.includes(row[methodKey].toString().trim())) return false;
+        }
+        
+        return true;
+    });
+};
+
+window.loadTopicData = function(topic) {
     if (!topic || topic === 'home') return;
 
+    let prefix = topic; 
+    if (topic.includes('seatbelt') || topic === 's') prefix = 's';
+    if (topic.includes('mobile') || topic === 'mp') prefix = 'mp';
+
     Promise.all([
-        d3.csv(`data/${topic}_jurisdiction.csv`),
-        d3.csv(`data/${topic}_location.csv`),
-        d3.csv(`data/${topic}_age.csv`),
-        d3.csv(`data/${topic}_detection.csv`)
-    ]).then(([jurisdiction, location, age, detection]) => {
+        d3.csv(`data/${prefix}_jurisdiction.csv`),
+        d3.csv(`data/${prefix}_location.csv`),
+        d3.csv(`data/${prefix}_age.csv`),
+        d3.csv(`data/${prefix}_detection.csv`),
+        d3.csv(`data/${prefix}_license.csv`) 
+    ]).then(([jurisdiction, location, age, detection, license]) => {
         
-        rawDatasets = { jurisdiction, location, age, detection };
-        populateDynamicDropdowns();
-        renderDashboardCharts();
-        
+        if (detection) {
+            detection = detection.filter(d => {
+                const methodKey = Object.keys(d).find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
+                return methodKey && d[methodKey] && d[methodKey].trim().toLowerCase() !== 'unknown';
+            });
+        }
+
+        window.rawDatasets = { jurisdiction, location, age, detection, license };
+        if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
+        window.renderDashboardCharts();
     }).catch(err => {
-        alert("CRITICAL ERROR: Failed to load CSV data.\n\nMake sure you are running a Local Server (like Live Server in VS Code) and your files are named correctly (.csv).");
         console.error("Data Load Error:", err);
     });
-}
+};
 
-function populateDynamicDropdowns() {
-    const ds = rawDatasets;
+window.populateDynamicDropdowns = function() {
+    const ds = window.rawDatasets;
+    if (!ds.jurisdiction) return;
+
     const years = [...new Set(ds.jurisdiction.map(d => d.YEAR))].sort((a,b)=>b-a);
     const locations = [...new Set(ds.location.map(d => d.LOCATION))].sort();
     const ages = [...new Set(ds.age.map(d => d.AGE_GROUP))].sort();
-    const methods = [...new Set(ds.detection.map(d => d.DETECTION_METHOD))].sort();
+    
+    // Check detection method column name dynamically
+    let methods = [];
+    if (ds.detection && ds.detection.length > 0) {
+        const mKey = Object.keys(ds.detection[0]).find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
+        if (mKey) methods = [...new Set(ds.detection.map(d => d[mKey]))].sort();
+    }
 
-    fillSelect('filter-year', years);
-    fillSelect('filter-location', locations);
-    fillSelect('filter-age', ages);
-    fillSelect('filter-method', methods);
-    fillSelect('filter-jurisdiction', ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT']);
-}
-
-function fillSelect(elementId, items) {
-    const select = document.getElementById(elementId);
-    if(!select) return;
-    select.innerHTML = `<option value="all">All</option>`;
-    items.forEach(item => {
-        if(item && item !== 'Unknown') select.innerHTML += `<option value="${item}">${item}</option>`;
-    });
-}
+    if(typeof window.fillSelect === 'function') {
+        window.fillSelect('filter-year', years);
+        window.fillSelect('filter-location', locations);
+        window.fillSelect('filter-age', ages);
+        window.fillSelect('filter-method', methods);
+        window.fillSelect('filter-jurisdiction', ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT']);
+    }
+};
 
 window.renderDashboardCharts = function() {
-    if (!rawDatasets.jurisdiction) return;
-    const filters = getActiveFilters();
+    if (!window.rawDatasets.jurisdiction) return;
 
-    // call modular charts
-    if (typeof renderYearChartDynamic === 'function') renderYearChartDynamic('chart-year', rawDatasets.jurisdiction);
-    if (typeof renderLocationChartDynamic === 'function') renderLocationChartDynamic('chart-location', rawDatasets.location);
-    if (typeof renderAgeGroupChartDynamic === 'function') renderAgeGroupChartDynamic('chart-age', rawDatasets.age);
+    const filters = window.getActiveFilters();
+    const fJurisdiction = window.getFilteredData(window.rawDatasets.jurisdiction, filters);
+    const fDetection = window.getFilteredData(window.rawDatasets.detection, filters);
+    const fLocation = window.getFilteredData(window.rawDatasets.location, filters);
+    const fAge = window.getFilteredData(window.rawDatasets.age, filters);
+    const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
 
-    drawStandardChart('chart-method', 'doughnut', rawDatasets.detection, 'DETECTION_METHOD', window.okabeItoColors, { 
-        plugins: { legend: { position: 'right' } } 
-    });
+    if (window.checkDataAndToggle('chart-method', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('chart-method', fDetection);
+    if (window.checkDataAndToggle('chart-jurisdiction', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('chart-jurisdiction', fJurisdiction);
+    if (window.checkDataAndToggle('chart-location', fLocation) && typeof renderLocationChart === 'function') renderLocationChart('chart-location', fLocation);
+    if (window.checkDataAndToggle('chart-age', fAge) && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('chart-age', fAge);
+    if (window.checkDataAndToggle('chart-normalized', fJurisdiction) && typeof renderNormalizedChart === 'function') renderNormalizedChart('chart-normalized', fJurisdiction, fLicense);
     
-    drawStandardChart('chart-jurisdiction', 'bar', rawDatasets.jurisdiction, 'JURISDICTION', window.okabeItoColors[0], { 
-        indexAxis: 'y', scales: { x: { beginAtZero: true } } 
-    });
-    
-    drawStandardChart('chart-trend', 'line', rawDatasets.jurisdiction, 'YEAR', window.okabeItoColors[3], { 
-        fill: true, backgroundColor: 'rgba(213, 94, 0, 0.15)', // Vermilion with opacity for area effect
-        interaction: { mode: 'index', intersect: false },
-        scales: { y: { beginAtZero: true } }
-    });
-}
+    const kpiContainer = document.getElementById('offenseLevelKpiContainer');
+    if (kpiContainer) {
+        let activeKpiData = [];
+        
+        if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
+        else if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
+        else if (fAge && fAge.length > 0) activeKpiData = fAge;
+        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
 
-function drawStandardChart(canvasId, type, dataset, groupKey, colors, extraOptions = {}) {
-    if (!dataset) return;
-    const filters = getActiveFilters();
-    let filtered = dataset.filter(row => {
-        if (filters.year !== 'all' && row['YEAR'] && row['YEAR'] !== filters.year) return false;
-        return true;
-    });
-
-    const grouped = {}; // Group data by selected key
-    filtered.forEach(row => {
-        const key = row[groupKey];
-        if (!key || key === 'Unknown') return;
-        const val = parseFloat(row['Sum(OFFENSES_SUM)']) || parseFloat(row['OFFENSES_SUM (Sum)']) || 0;
-        grouped[key] = (grouped[key] || 0) + val;
-    });
-
-    const labels = Object.keys(grouped).sort();
-    const values = labels.map(l => grouped[l]);
-
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    if (activeChartInstances[canvasId]) activeChartInstances[canvasId].destroy();
-
-    activeChartInstances[canvasId] = new Chart(ctx, {
-        type: type,
-        data: { 
-            labels: labels, 
-            datasets: [{ 
-                label: 'Violations', 
-                data: values, 
-                backgroundColor: type === 'pie' || type === 'doughnut' ? colors : colors, 
-                borderColor: type === 'line' ? colors : (type === 'pie' || type === 'doughnut' ? '#fff' : 'transparent'), 
-                tension: 0.3,
-                pointStyle: window.pointShapes[0],
-                pointRadius: 5
-            }] 
-        },
-        options: { 
-            responsive: true, maintainAspectRatio: false, 
-            plugins: { legend: { display: (type === 'pie' || type === 'doughnut') } }, 
-            ...extraOptions 
+        if (activeKpiData.length === 0) {
+            kpiContainer.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#64748b; font-weight:bold; font-size:14px; text-align:center; padding: 20px;">No data available for the selected filters.</div>';
+        } else {
+            if (typeof renderOffenseLevelKpi === 'function') {
+                renderOffenseLevelKpi('offenseLevelKpiContainer', activeKpiData);
+                kpiContainer.innerHTML = kpiContainer.innerHTML.replace(/\$/g, '');
+            }
         }
-    });
-}
+    }
 
-window.openModal = function(chartId) {
-    document.getElementById('chart-modal').style.display = 'flex';
-    const config = chartConfigs.find(c => c.id === chartId);
-    document.getElementById('modal-title').innerText = config.title;
-    document.getElementById('modal-chart-container').innerHTML = `<canvas id="modal-canvas"></canvas>`;
-    
-    if (!rawDatasets.jurisdiction) return;
-
-    if (chartId === 'year') renderYearChartDynamic('modal-canvas', rawDatasets.jurisdiction);
-    else if (chartId === 'location') renderLocationChartDynamic('modal-canvas', rawDatasets.location);
-    else if (chartId === 'age') renderAgeGroupChartDynamic('modal-canvas', rawDatasets.age);
-    else if (chartId === 'method') drawStandardChart('modal-canvas', 'doughnut', rawDatasets.detection, 'DETECTION_METHOD', window.okabeItoColors, { plugins: { legend: { position: 'right' } }});
-    else if (chartId === 'jurisdiction') drawStandardChart('modal-canvas', 'bar', rawDatasets.jurisdiction, 'JURISDICTION', window.okabeItoColors[0], { indexAxis: 'y', scales: { x: { beginAtZero: true } } });
-    else if (chartId === 'trend') drawStandardChart('modal-canvas', 'line', rawDatasets.jurisdiction, 'YEAR', window.okabeItoColors[3], { fill: true, backgroundColor: 'rgba(213, 94, 0, 0.15)', interaction: { mode: 'index', intersect: false }, scales: { y: { beginAtZero: true } } });
+    setTimeout(window.enforceInteractiveHighlight, 150);
 };
 
 window.onload = function() {
-    buildDashboardGrid(); 
+    if(typeof window.buildDashboardGrid === 'function') window.buildDashboardGrid(); 
+    if(typeof window.injectDataTableModal === 'function') window.injectDataTableModal(); 
 
     document.getElementById('topic-menu').addEventListener('click', (e) => {
         if (!e.target.classList.contains('nav-btn')) return;
-        
         document.querySelectorAll('#topic-menu .nav-btn').forEach(b => b.classList.remove('active'));
         e.target.classList.add('active');
         
@@ -188,20 +273,30 @@ window.onload = function() {
             document.getElementById('home-view').style.display = 'none';
             document.getElementById('dashboard-view').style.display = 'block';
             
-            document.querySelectorAll('.chart-filter').forEach(select => select.value = 'all');
-            currentTopic = topic;
-            loadTopicData(currentTopic);
+            document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
+                const allCb = dropdown.querySelector('.filter-checkbox-all');
+                const items = dropdown.querySelectorAll('.filter-checkbox-item');
+                const text = dropdown.querySelector('.dropdown-text');
+                if (allCb) allCb.checked = true;
+                items.forEach(i => i.checked = false);
+                if (text) text.innerText = 'All';
+            });
+
+            window.currentTopic = topic;
+            window.loadTopicData(window.currentTopic);
         }
     });
 
-    // re-render charts when filters change
-    document.querySelectorAll('.chart-filter').forEach(select => {
-        select.addEventListener('change', renderDashboardCharts);
-    });
-
     document.getElementById('reset-view-btn').addEventListener('click', () => {
-        document.querySelectorAll('.chart-filter').forEach(select => select.value = 'all');
-        renderDashboardCharts();
+        document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
+            const allCb = dropdown.querySelector('.filter-checkbox-all');
+            const items = dropdown.querySelectorAll('.filter-checkbox-item');
+            const text = dropdown.querySelector('.dropdown-text');
+            if (allCb) allCb.checked = true;
+            items.forEach(i => i.checked = false);
+            if (text) text.innerText = 'All';
+        });
+        window.renderDashboardCharts();
     });
 
     document.getElementById('close-modal-btn').addEventListener('click', () => {
