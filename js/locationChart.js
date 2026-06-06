@@ -1,77 +1,101 @@
-function renderLocationChartDynamic(canvasId, dataset) {
-    if (!dataset) return;
-    const filters = getActiveFilters();
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    
-    if (activeChartInstances[canvasId]) {
-        activeChartInstances[canvasId].destroy();
-    }
+function renderLocationChart(arg1, arg2) {
+    let canvasId = 'locationChart';
+    let dataset = arg1;
+    if (arg2 !== undefined) { canvasId = arg1; dataset = arg2; }
+    if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
 
-    let filtered = dataset.filter(row => {
-        if (filters.year !== 'all' && row['YEAR'] && row['YEAR'] !== filters.year) return false;
-        if (filters.location !== 'all' && row['LOCATION'] && row['LOCATION'] !== filters.location) return false;
+    let ctx = document.getElementById(canvasId);
+    if (!ctx) ctx = document.querySelector('canvas[id*="location"]');
+    if (!ctx) return;
+
+    let existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
+    const filters = window.getActiveFilters ? window.getActiveFilters() : { year: ['all'], location: ['all'] };
+    
+    const firstRow = dataset[0];
+    const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
+    const locKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('loc')) || 'LOCATION';
+
+    let filteredData = dataset.filter(row => {
+        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString())) return false;
+        if (filters.location && !filters.location.includes('all') && row[locKey] && !filters.location.includes(row[locKey].toString())) return false;
         return true;
     });
 
-    const isSingleYear = (filters.year !== 'all');
-    let chartData;
+    let years = [...new Set(filteredData.map(row => row[yearKey]).filter(Boolean))].map(y => y.toString()).sort();
+    let uniqueLocations = [...new Set(filteredData.map(row => row[locKey]).filter(Boolean))].map(l => l.toString().trim()).sort();
 
-    const colors = ['#56B4E9', '#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442'];
-
-    let chartOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { 
-            legend: { position: 'bottom' } 
-        }
+    const getValue = (row) => {
+        const keys = Object.keys(row);
+        const k = keys.find(key => {
+            const l = key.toLowerCase();
+            return l.includes('offen') || l.includes('total') || l.includes('count') || l.includes('fine');
+        });
+        return k ? (parseFloat(row[k]) || 1) : 1;
     };
 
-    if (isSingleYear) {
-        // Pie Chart
-        const grouped = {};
-        filtered.forEach(row => {
-            const loc = row['LOCATION'];
-            if (!loc || loc === 'Unknown') return;
-            const val = parseFloat(row['Sum(OFFENSES_SUM)']) || 0;
-            grouped[loc] = (grouped[loc] || 0) + val;
-        });
-        
-        chartData = {
-            labels: Object.keys(grouped).sort(),
-            datasets: [{
-                label: 'Violations',
-                data: Object.keys(grouped).sort().map(k => grouped[k]),
-                backgroundColor: colors,
-                borderWidth: 1
-            }]
-        };
-    } else {
-        // Stacked Bar Chart
-        const years = [...new Set(filtered.map(r => r.YEAR))].sort((a,b) => a-b);
-        const locations = [...new Set(filtered.map(r => r.LOCATION))].filter(l => l && l !== 'Unknown').sort();
-        
-        const datasetsArr = locations.map((loc, i) => {
-            const data = years.map(y => {
-                return filtered.filter(r => r.YEAR == y && r.LOCATION === loc)
-                               .reduce((sum, r) => sum + (parseFloat(r['Sum(OFFENSES_SUM)']) || 0), 0);
-            });
-            return {
-                label: loc,
-                data: data,
-                backgroundColor: colors[i % colors.length]
-            };
-        });
-        chartData = { labels: years, datasets: datasetsArr };
+    const yearlyTotals = {};
+    years.forEach(year => {
+        yearlyTotals[year] = filteredData
+            .filter(row => row[yearKey] && row[yearKey].toString() === year)
+            .reduce((sum, row) => sum + getValue(row), 0) || 1;
+    });
 
-        chartOptions.scales = {
-            x: { stacked: true },
-            y: { stacked: true }
-        };
-    }
+    const targetColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
 
-    activeChartInstances[canvasId] = new Chart(ctx, {
-        type: isSingleYear ? 'pie' : 'bar', // dynamically switches between pie and bar
-        data: chartData,
-        options: chartOptions
+    const formatLegendLabel = (loc) => {
+        if (loc === 'Major Cities of Australia') return ['Major Cities', 'of Australia'];
+        if (loc.endsWith(' Australia') && loc !== 'Australia') {
+            return [loc.replace(' Australia', ''), 'Australia'];
+        }
+        return loc;
+    };
+
+    const datasets = uniqueLocations.map((loc, index) => {
+        const dataPoints = years.map(year => {
+            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === loc);
+            const sum = matches.reduce((s, row) => s + getValue(row), 0);
+            return (sum / yearlyTotals[year]) * 100;
+        });
+
+        return {
+            label: formatLegendLabel(loc),
+            data: dataPoints,
+            backgroundColor: targetColors[index % targetColors.length],
+            borderRadius: 0
+        };
+    });
+
+    new Chart(ctx, {
+        type: 'bar',
+        data: { labels: years, datasets: datasets },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { 
+                legend: { 
+                    display: true, 
+                    position: 'right',
+                    labels: {
+                        font: { size: 10 },
+                        boxWidth: 10,
+                        padding: 10
+                    }
+                },
+                tooltip: { 
+                    callbacks: { 
+                        label: (context) => {
+                            let labelStr = Array.isArray(context.dataset.label) ? context.dataset.label.join(' ') : context.dataset.label;
+                            return `${labelStr}: ${context.raw.toFixed(1)}%`;
+                        } 
+                    } 
+                }
+            },
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } }
+            }
+        }
     });
 }
