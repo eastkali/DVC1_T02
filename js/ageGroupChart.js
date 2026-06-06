@@ -1,75 +1,95 @@
-function renderAgeGroupChartDynamic(canvasId, dataset) {
-    if (!dataset) return;
-    const filters = window.getActiveFilters();
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    
-    if (activeChartInstances[canvasId]) {
-        activeChartInstances[canvasId].destroy();
-    }
+function renderAgeGroupChart(arg1, arg2) {
+    let canvasId = 'ageChart';
+    let dataset = arg1;
+    if (arg2 !== undefined) { canvasId = arg1; dataset = arg2; }
 
-    let filtered = dataset.filter(row => {
-        if (filters.year !== 'all' && row['YEAR'] && row['YEAR'] !== filters.year) return false;
-        if (filters.age !== 'all' && row['AGE_GROUP'] && row['AGE_GROUP'] !== filters.age) return false;
+    // ensure valid dataset
+    if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
+
+    let ctx = document.getElementById(canvasId);
+    if (!ctx) ctx = document.querySelector('canvas[id*="age"]');
+    if (!ctx) return;
+
+    let existingChart = Chart.getChart(ctx);
+    if (existingChart) existingChart.destroy();
+
+    // Retrieve global filters
+    const filters = window.getActiveFilters ? window.getActiveFilters() : {};
+
+    const firstRow = dataset[0] || {};
+    const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
+    const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
+    const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
+
+    const activeYear = filters.year || ['all'];
+    const activeJurisdiction = filters.jurisdiction || ['all'];
+    const activeAge = filters.age || filters.age_group || filters.ageGroup || ['all'];
+
+    let filteredDataset = dataset.filter(row => {
+        if (!activeYear.includes('all') && row[yearKey] && !activeYear.includes(row[yearKey].toString())) return false;
+        if (!activeJurisdiction.includes('all') && row[jurisKey] && !activeJurisdiction.includes(row[jurisKey].toString().trim())) return false;
+        if (!activeAge.includes('all') && ageKey && row[ageKey] && !activeAge.includes(row[ageKey].toString().trim())) return false;
         return true;
     });
 
-    // determine chart mode: <1 (bar) and >1 (line)
-    const isSingleYear = (filters.year !== 'all');
-    let chartData;
-    const colors = window.okabeItoColors || ['#56B4E9', '#009E73', '#E69F00', '#D55E00', '#0072B2'];
-    const shapes = window.pointShapes || ['circle', 'rect', 'triangle', 'rectRot', 'star'];
+    let uniqueAges = [...new Set(filteredDataset.map(row => row[ageKey]).filter(Boolean))].map(a => a.toString().trim()).sort();
+    let years = [...new Set(filteredDataset.map(row => row[yearKey]).filter(Boolean))].map(Number).sort((a, b) => a - b);
 
-    if (isSingleYear) {
-        const grouped = {};
-        filtered.forEach(row => {
-            const age = row['AGE_GROUP'];
-            if (!age || age === 'Unknown') return;
-            const val = parseFloat(row['Sum(OFFENSES_SUM)']) || 0;
-            grouped[age] = (grouped[age] || 0) + val;
+    const getValue = (row) => {
+        const keys = Object.keys(row);
+        const k = keys.find(key => {
+            const l = key.toLowerCase();
+            return l.includes('offen') || l.includes('total') || l.includes('count') || l.includes('fine');
         });
-        chartData = {
-            labels: Object.keys(grouped).sort(),
-            datasets: [{
-                label: 'Violations',
-                data: Object.keys(grouped).sort().map(k => grouped[k]),
-                backgroundColor: colors[1]
-            }]
-        };
-    } else {
-        const years = [...new Set(filtered.map(r => r.YEAR))].sort((a,b) => a-b);
-        const ages = [...new Set(filtered.map(r => r.AGE_GROUP))].filter(a => a && a !== 'Unknown').sort();
+        return k ? (parseFloat(row[k]) || 1) : 1;
+    };
+
+    const targetColors = window.okabeItoColors || ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
+    const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot'];
+    
+    const isSingleYear = years.length === 1;
+
+    const datasets = uniqueAges.map((age, index) => {
+        const dataPoints = years.map(year => {
+            const matches = filteredDataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === age && row[yearKey] == year);
+            return matches.reduce((sum, row) => sum + getValue(row), 0);
+        });
         
-         // build dataset per age group
-        const datasetsArr = ages.map((age, i) => {
-            const data = years.map(y => {
-                return filtered.filter(r => r.YEAR == y && r.AGE_GROUP === age)
-                               .reduce((sum, r) => sum + (parseFloat(r['Sum(OFFENSES_SUM)']) || 0), 0);
-            });
-            return {
-                label: age,
-                data: data,
-                borderColor: colors[i % colors.length],
-                backgroundColor: colors[i % colors.length],
-                pointStyle: shapes[i % shapes.length],
-                pointRadius: 6,
-                pointHoverRadius: 9,
-                tension: 0.3
-            };
-        });
-        chartData = { labels: years, datasets: datasetsArr };
-    }
+        const color = targetColors[index % targetColors.length];
+        const shape = targetShapes[index % targetShapes.length];
+        
+        return { 
+            label: age, 
+            data: dataPoints, 
+            borderColor: color, 
+            backgroundColor: color, 
+            pointBackgroundColor: 'transparent', 
+            pointBorderColor: color,
+            pointStyle: shape, 
+            pointRadius: 4,                  
+            pointHoverRadius: 6, 
+            pointBorderWidth: 2, 
+            fill: false, 
+            tension: 0.1 
+        };
+    });
 
-    activeChartInstances[canvasId] = new Chart(ctx, {
+    new Chart(ctx, {
         type: isSingleYear ? 'bar' : 'line',
-        data: chartData,
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false }, // tooltip interaction
-            plugins: { legend: { position: 'bottom' } },
-            scales: {
-                y: { beginAtZero: true, title: { display: true, text: 'Violations' } },
-                x: { title: { display: true, text: isSingleYear ? 'Age Group' : 'Year' } }
+        data: { labels: years, datasets: datasets },
+        options: { 
+            responsive: true, maintainAspectRatio: false, 
+            plugins: { 
+                legend: { display: true, position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } } 
+            },
+            scales: { 
+                x: { 
+                    title: { display: true, text: 'Year', font: { weight: 'bold' }, color: '#333' } 
+                },
+                y: { 
+                    beginAtZero: true, 
+                    title: { display: true, text: 'Total Offenses', font: { weight: 'bold' }, color: '#333' } 
+                } 
             }
         }
     });
