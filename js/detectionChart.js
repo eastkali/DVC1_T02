@@ -38,45 +38,90 @@ function renderDetectionChart(arg1, arg2) {
     const targetColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
 
     const isSingleYear = years.length === 1;
+    const isSingleMethod = uniqueMethods.length === 1;
+    const useBarChart = isSingleYear || isSingleMethod;
 
-    const datasets = uniqueMethods.map((method, index) => {
-        const dataPoints = years.map(year => {
-            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] == year);
+    let chartLabels = [];
+    let chartDatasets = [];
+
+    if (isSingleYear) {
+        // Case A: 1 Year selected -> X-axis shows Method names directly
+        chartLabels = uniqueMethods;
+        const activeYear = years[0];
+
+        const dataPoints = uniqueMethods.map(method => {
+            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] == activeYear);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
-        const color = targetColors[index % targetColors.length];
-        return {
-            label: method,
+
+        chartDatasets = [{
             data: dataPoints,
-            borderColor: color,
-            backgroundColor: color,
-            fill: !isSingleYear, // Turn off area fill forbars
-            pointRadius: 0,
-            pointHoverRadius: 4,
-            tension: 0.1
-        };
-    });
+            backgroundColor: uniqueMethods.map((_, index) => targetColors[index % targetColors.length]),
+            borderRadius: 4
+        }];
+    } else if (isSingleMethod) {
+        // Case B: 1 Method selected -> X-axis shows Years timeline
+        chartLabels = years;
+        const activeMethod = uniqueMethods[0];
+
+        const dataPoints = years.map(year => {
+            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === activeMethod && row[yearKey] == year);
+            return matches.reduce((sum, row) => sum + getValue(row), 0);
+        });
+
+        chartDatasets = [{
+            label: activeMethod,
+            data: dataPoints,
+            backgroundColor: targetColors[0],
+            borderRadius: 4
+        }];
+    } else {
+        // Case C: Multi-year & Multi-method -> Stacked Area Line Chart
+        chartLabels = years;
+        chartDatasets = uniqueMethods.map((method, index) => {
+            const dataPoints = years.map(year => {
+                const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] == year);
+                return matches.reduce((sum, row) => sum + getValue(row), 0);
+            });
+            const color = targetColors[index % targetColors.length];
+            return {
+                label: method,
+                data: dataPoints,
+                borderColor: color,
+                backgroundColor: color,
+                fill: true,
+                pointRadius: 0,
+                pointHoverRadius: 4,
+                tension: 0.1
+            };
+        });
+    }
 
     new Chart(ctx, {
-        type: isSingleYear ? 'bar' : 'line',
-        data: { labels: years, datasets: datasets },
+        type: useBarChart ? 'bar' : 'line',
+        data: { labels: chartLabels, datasets: chartDatasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
                 legend: { 
-                    display: true, 
+                    display: !useBarChart, 
                     position: 'right',
-                    labels: {
-                        font: { size: 10 },
-                        boxWidth: 12
+                    labels: { font: { size: 10 }, boxWidth: 12 }
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            let labelStr = isSingleYear ? context.label : (context.dataset.label || "Offenses");
+                            return `${labelStr}: ${context.raw.toLocaleString()}`;
+                        }
                     }
-                } 
+                }
             },
             scales: {
                 // Switch from stacked area to bars if a single year is selected
-                x: { stacked: !isSingleYear },
-                y: { stacked: !isSingleYear, beginAtZero: true }
+                x: { stacked: !useBarChart },
+                y: { stacked: !useBarChart, beginAtZero: true }
             }
         }
     });

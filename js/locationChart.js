@@ -52,53 +52,103 @@ function renderLocationChart(arg1, arg2) {
         return loc;
     };
 
-    // Determine if only a single year is selected
-    const isSingleYear = years.length === 1;
+    const isSingleYear = years.length === 1; // Determine if only a single year is selected
+    const isSingleLocation = uniqueLocations.length === 1;
+    const useBarChart = isSingleYear || isSingleLocation;
+    
+    // If only 1 location is selected, % is always 100. We switch to raw counts to show an actual trend.
+    const showPercentage = !isSingleLocation; 
 
-    const datasets = uniqueLocations.map((loc, index) => {
-        const dataPoints = years.map(year => {
-            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === loc);
+    let chartLabels = [];
+    let chartDatasets = [];
+
+    if (isSingleYear) {
+        // Case A: 1 Year selected -> Locations on X-axis, showing % spread across locations
+        chartLabels = uniqueLocations.map(loc => formatLegendLabel(loc));
+        const activeYear = years[0];
+        
+        const dataPoints = uniqueLocations.map(loc => {
+            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === activeYear && row[locKey] && row[locKey].toString().trim() === loc);
             const sum = matches.reduce((s, row) => s + getValue(row), 0);
-            return (sum / yearlyTotals[year]) * 100;
+            return (sum / yearlyTotals[activeYear]) * 100;
         });
 
-        return {
-            label: formatLegendLabel(loc),
+        chartDatasets = [{
             data: dataPoints,
-            backgroundColor: targetColors[index % targetColors.length],
-            borderRadius: 0
-        };
-    });
+            backgroundColor: uniqueLocations.map((_, index) => targetColors[index % targetColors.length]),
+            borderRadius: 4
+        }];
+    } else if (isSingleLocation) {
+        // Case B: 1 Location selected -> Years on X-axis, showing raw actual counts
+        chartLabels = years;
+        const activeLoc = uniqueLocations[0];
+
+        const dataPoints = years.map(year => {
+            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === activeLoc);
+            return matches.reduce((s, row) => s + getValue(row), 0);
+        });
+
+        chartDatasets = [{
+            label: Array.isArray(formatLegendLabel(activeLoc)) ? formatLegendLabel(activeLoc).join(' ') : formatLegendLabel(activeLoc),
+            data: dataPoints,
+            backgroundColor: targetColors[0],
+            borderRadius: 4
+        }];
+    } else {
+        // Case C: Multi-year & Multi-location -> Standard 100% Stacked Bar
+        chartLabels = years;
+        chartDatasets = uniqueLocations.map((loc, index) => {
+            const dataPoints = years.map(year => {
+                const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === loc);
+                const sum = matches.reduce((s, row) => s + getValue(row), 0);
+                return (sum / yearlyTotals[year]) * 100;
+            });
+
+            return {
+                label: formatLegendLabel(loc),
+                data: dataPoints,
+                backgroundColor: targetColors[index % targetColors.length],
+                borderRadius: 0
+            };
+        });
+    }
 
     new Chart(ctx, {
         type: 'bar',
-        data: { labels: years, datasets: datasets },
+        data: { labels: chartLabels, datasets: chartDatasets },
         options: {
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
                 legend: { 
-                    display: true, 
+                    display: !useBarChart, 
                     position: 'right',
-                    labels: {
-                        font: { size: 10 },
-                        boxWidth: 10,
-                        padding: 10
-                    }
+                    labels: { font: { size: 10 }, boxWidth: 10, padding: 10 }
                 },
                 tooltip: { 
                     callbacks: { 
                         label: (context) => {
-                            let labelStr = Array.isArray(context.dataset.label) ? context.dataset.label.join(' ') : context.dataset.label;
-                            return `${labelStr}: ${context.raw.toFixed(1)}%`;
+                            let labelStr = "";
+                            if (isSingleYear) {
+                                labelStr = Array.isArray(context.label) ? context.label.join(' ') : context.label;
+                            } else {
+                                labelStr = context.dataset.label || "Value";
+                            }
+                            return showPercentage 
+                                ? `${labelStr}: ${context.raw.toFixed(1)}%` 
+                                : `${labelStr}: ${context.raw.toLocaleString()}`;
                         } 
                     } 
                 }
             },
             scales: {
                 // Unstack bars  if a single year is selected
-                x: { stacked: !isSingleYear },
-                y: { stacked: !isSingleYear, max: isSingleYear ? undefined : 100, ticks: { callback: v => v + '%' } }
+                x: { stacked: !useBarChart },
+                y: { 
+                    stacked: !useBarChart, 
+                    max: showPercentage && !useBarChart ? 100 : undefined, 
+                    ticks: { callback: v => showPercentage ? v + '%' : v.toLocaleString() } 
+                }
             }
         }
     });

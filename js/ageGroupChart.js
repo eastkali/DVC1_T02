@@ -49,42 +49,79 @@ function renderAgeGroupChart(arg1, arg2) {
     
     const isSingleYear = years.length === 1;
 
-    const datasets = uniqueAges.map((age, index) => {
-        const dataPoints = years.map(year => {
-            const matches = filteredDataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === age && row[yearKey] == year);
+    let chartLabels = [];
+    let chartDatasets = [];
+
+    if (isSingleYear) {
+        chartLabels = uniqueAges;
+        const activeYear = years[0];
+
+        const dataPoints = uniqueAges.map(age => {
+            const matches = filteredDataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === age && row[yearKey] == activeYear);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
-        
-        const color = targetColors[index % targetColors.length];
-        const shape = targetShapes[index % targetShapes.length];
-        
-        return { 
-            label: age, 
-            data: dataPoints, 
-            borderColor: color, 
-            backgroundColor: color, 
-            pointBackgroundColor: 'transparent', 
-            pointBorderColor: color,
-            pointStyle: shape, 
-            pointRadius: 4,                  
-            pointHoverRadius: 6, 
-            pointBorderWidth: 2, 
-            fill: false, 
-            tension: 0.1 
-        };
-    });
+
+        chartDatasets = [{
+            data: dataPoints,
+            backgroundColor: uniqueAges.map((_, index) => targetColors[index % targetColors.length]),
+            borderRadius: 4
+        }];
+    } else {
+        chartLabels = years;
+        chartDatasets = uniqueAges.map((age, index) => {
+            const dataPoints = years.map(year => {
+                const matches = filteredDataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === age && row[yearKey] == year);
+                return matches.reduce((sum, row) => sum + getValue(row), 0);
+            });
+            
+            const color = targetColors[index % targetColors.length];
+            const shape = targetShapes[index % targetShapes.length];
+            
+            return { 
+                label: age, 
+                data: dataPoints, 
+                borderColor: color, 
+                backgroundColor: color, 
+                pointBackgroundColor: 'transparent', 
+                pointBorderColor: color,
+                pointStyle: shape, 
+                pointRadius: 4,                  
+                pointHoverRadius: 6, 
+                pointBorderWidth: 2, 
+                fill: false, 
+                tension: 0.1 
+            };
+        });
+    }
 
     new Chart(ctx, {
         type: isSingleYear ? 'bar' : 'line',
-        data: { labels: years, datasets: datasets },
+        data: { labels: chartLabels, datasets: chartDatasets },
         options: { 
             responsive: true, maintainAspectRatio: false, 
             plugins: { 
-                legend: { display: true, position: 'right', labels: { font: { size: 10 }, boxWidth: 12 } } 
+                legend: { 
+                    display: !isSingleYear,
+                    position: 'right', 
+                    labels: { font: { size: 10 }, boxWidth: 12 } 
+                },
+                tooltip: {
+                    callbacks: {
+                        label: (context) => {
+                            let labelStr = isSingleYear ? context.label : context.dataset.label;
+                            return `${labelStr}: ${context.raw.toLocaleString()}`;
+                        }
+                    }
+                }
             },
             scales: { 
                 x: { 
-                    title: { display: true, text: 'Year', font: { weight: 'bold' }, color: '#333' } 
+                    title: { 
+                        display: true, 
+                        text: isSingleYear ? 'Age Group' : 'Year',
+                        font: { weight: 'bold' }, 
+                        color: '#333' 
+                    } 
                 },
                 y: { 
                     beginAtZero: true, 
