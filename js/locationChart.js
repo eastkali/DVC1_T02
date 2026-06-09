@@ -52,6 +52,9 @@ function renderLocationChart(arg1, arg2) {
         return loc;
     };
 
+    // Determine if only a single year is selected
+    const isSingleYear = years.length === 1;
+
     const datasets = uniqueLocations.map((loc, index) => {
         const dataPoints = years.map(year => {
             const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === loc);
@@ -93,8 +96,9 @@ function renderLocationChart(arg1, arg2) {
                 }
             },
             scales: {
-                x: { stacked: true },
-                y: { stacked: true, max: 100, ticks: { callback: v => v + '%' } }
+                // Unstack bars  if a single year is selected
+                x: { stacked: !isSingleYear },
+                y: { stacked: !isSingleYear, max: isSingleYear ? undefined : 100, ticks: { callback: v => v + '%' } }
             }
         }
     });

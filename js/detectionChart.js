@@ -50,8 +50,8 @@ function renderDetectionChart(arg1, arg2) {
             data: dataPoints,
             borderColor: color,
             backgroundColor: color,
-            fill: !isSingleYear,
-            pointRadius: isSingleYear ? 4 : 0,
+            fill: !isSingleYear, // Turn off area fill forbars
+            pointRadius: 0,
             pointHoverRadius: 4,
             tension: 0.1
         };
@@ -74,8 +74,9 @@ function renderDetectionChart(arg1, arg2) {
                 } 
             },
             scales: {
-                x: { stacked: true },
-                y: { stacked: true, beginAtZero: true }
+                // Switch from stacked area to bars if a single year is selected
+                x: { stacked: !isSingleYear },
+                y: { stacked: !isSingleYear, beginAtZero: true }
             }
         }
     });
