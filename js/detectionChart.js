@@ -18,13 +18,13 @@ function renderDetectionChart(arg1, arg2) {
     const methodKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('detect') || k.toLowerCase().includes('method')) || 'DETECTION_METHOD';
 
     let filteredData = dataset.filter(row => {
-        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString())) return false;
-        if (filters.method && !filters.method.includes('all') && row[methodKey] && !filters.method.includes(row[methodKey].toString())) return false;
+        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString().trim())) return false;
+        if (filters.method && !filters.method.includes('all') && row[methodKey] && !filters.method.includes(row[methodKey].toString().trim())) return false;
         return true;
     });
 
-    let uniqueMethods = [...new Set(filteredData.map(row => row[methodKey]).filter(Boolean))].map(m => m.toString().trim()).sort();
-    let years = [...new Set(filteredData.map(row => row[yearKey]).filter(Boolean))].map(y => y.toString()).sort();
+    let uniqueMethods = [...new Set(filteredData.map(row => row[methodKey] ? row[methodKey].toString().trim() : '').filter(m => m !== ''))].sort();
+    let years = [...new Set(filteredData.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(y => y !== ''))].sort();
 
     const getValue = (row) => {
         const keys = Object.keys(row);
@@ -35,9 +35,10 @@ function renderDetectionChart(arg1, arg2) {
         return k ? (parseFloat(row[k]) || 1) : 1;
     };
 
-    const targetColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
+    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
 
-    const isSingleYear = years.length === 1;
+    const activeYear = filters.year || ['all'];
+    const isSingleYear = (activeYear.length === 1 && activeYear[0] !== 'all') || (years.length === 1);
     const isSingleMethod = uniqueMethods.length === 1;
     const useBarChart = isSingleYear || isSingleMethod;
 
@@ -45,12 +46,11 @@ function renderDetectionChart(arg1, arg2) {
     let chartDatasets = [];
 
     if (isSingleYear) {
-        // Case A: 1 Year selected -> X-axis shows Method names directly
         chartLabels = uniqueMethods;
-        const activeYear = years[0];
+        const activeYearVal = (activeYear.length === 1 && activeYear[0] !== 'all') ? activeYear[0] : years[0];
 
         const dataPoints = uniqueMethods.map(method => {
-            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] == activeYear);
+            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] && row[yearKey].toString().trim() === activeYearVal);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
@@ -60,12 +60,11 @@ function renderDetectionChart(arg1, arg2) {
             borderRadius: 4
         }];
     } else if (isSingleMethod) {
-        // Case B: 1 Method selected -> X-axis shows Years timeline
         chartLabels = years;
         const activeMethod = uniqueMethods[0];
 
         const dataPoints = years.map(year => {
-            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === activeMethod && row[yearKey] == year);
+            const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === activeMethod && row[yearKey] && row[yearKey].toString().trim() === year);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
@@ -76,11 +75,10 @@ function renderDetectionChart(arg1, arg2) {
             borderRadius: 4
         }];
     } else {
-        // Case C: Multi-year & Multi-method -> Stacked Area Line Chart
         chartLabels = years;
         chartDatasets = uniqueMethods.map((method, index) => {
             const dataPoints = years.map(year => {
-                const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] == year);
+                const matches = filteredData.filter(row => row[methodKey] && row[methodKey].toString().trim() === method && row[yearKey] && row[yearKey].toString().trim() === year);
                 return matches.reduce((sum, row) => sum + getValue(row), 0);
             });
             const color = targetColors[index % targetColors.length];
@@ -100,7 +98,32 @@ function renderDetectionChart(arg1, arg2) {
     new Chart(ctx, {
         type: useBarChart ? 'bar' : 'line',
         data: { labels: chartLabels, datasets: chartDatasets },
+        plugins: [{
+            id: 'topLabels',
+            afterDatasetsDraw(chart) {
+                if (chart.config.type !== 'bar') return;
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach((dataset, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    const total = dataset.data.reduce((a, b) => a + (parseFloat(b) || 0), 0);
+                    meta.data.forEach((bar, index) => {
+                        const data = dataset.data[index];
+                        if (data) {
+                            ctx.save();
+                            ctx.fillStyle = '#475569';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.font = 'bold 11px sans-serif';
+                            const percentStr = total > 0 ? ((data / total) * 100).toFixed(1) + '%' : '0%';
+                            ctx.fillText(percentStr, bar.x, bar.y - 4);
+                            ctx.restore();
+                        }
+                    });
+                });
+            }
+        }],
         options: {
+            layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
@@ -119,7 +142,6 @@ function renderDetectionChart(arg1, arg2) {
                 }
             },
             scales: {
-                // Switch from stacked area to bars if a single year is selected
                 x: { stacked: !useBarChart },
                 y: { stacked: !useBarChart, beginAtZero: true }
             }

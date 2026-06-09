@@ -1,3 +1,4 @@
+// js/locationChart.js
 function renderLocationChart(arg1, arg2) {
     let canvasId = 'locationChart';
     let dataset = arg1;
@@ -18,13 +19,13 @@ function renderLocationChart(arg1, arg2) {
     const locKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('loc')) || 'LOCATION';
 
     let filteredData = dataset.filter(row => {
-        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString())) return false;
-        if (filters.location && !filters.location.includes('all') && row[locKey] && !filters.location.includes(row[locKey].toString())) return false;
+        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString().trim())) return false;
+        if (filters.location && !filters.location.includes('all') && row[locKey] && !filters.location.includes(row[locKey].toString().trim())) return false;
         return true;
     });
 
-    let years = [...new Set(filteredData.map(row => row[yearKey]).filter(Boolean))].map(y => y.toString()).sort();
-    let uniqueLocations = [...new Set(filteredData.map(row => row[locKey]).filter(Boolean))].map(l => l.toString().trim()).sort();
+    let years = [...new Set(filteredData.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(y => y !== ''))].sort();
+    let uniqueLocations = [...new Set(filteredData.map(row => row[locKey] ? row[locKey].toString().trim() : '').filter(l => l !== ''))].sort();
 
     const getValue = (row) => {
         const keys = Object.keys(row);
@@ -38,11 +39,12 @@ function renderLocationChart(arg1, arg2) {
     const yearlyTotals = {};
     years.forEach(year => {
         yearlyTotals[year] = filteredData
-            .filter(row => row[yearKey] && row[yearKey].toString() === year)
+            .filter(row => row[yearKey] && row[yearKey].toString().trim() === year)
             .reduce((sum, row) => sum + getValue(row), 0) || 1;
     });
 
-    const targetColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
+    // YOUR EXACT COLOR PALETTE
+    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
 
     const formatLegendLabel = (loc) => {
         if (loc === 'Major Cities of Australia') return ['Major Cities', 'of Australia'];
@@ -52,25 +54,23 @@ function renderLocationChart(arg1, arg2) {
         return loc;
     };
 
-    const isSingleYear = years.length === 1; // Determine if only a single year is selected
+    const activeYear = filters.year || ['all'];
+    const isSingleYear = (activeYear.length === 1 && activeYear[0] !== 'all') || (years.length === 1);
     const isSingleLocation = uniqueLocations.length === 1;
     const useBarChart = isSingleYear || isSingleLocation;
-    
-    // If only 1 location is selected, % is always 100. We switch to raw counts to show an actual trend.
-    const showPercentage = !isSingleLocation; 
+    const showPercentage = !isSingleLocation; // If only 1 location is selected, % is always 100. We switch to raw counts to show an actual trend.
 
     let chartLabels = [];
     let chartDatasets = [];
 
     if (isSingleYear) {
-        // Case A: 1 Year selected -> Locations on X-axis, showing % spread across locations
         chartLabels = uniqueLocations.map(loc => formatLegendLabel(loc));
-        const activeYear = years[0];
+        const activeYearVal = (activeYear.length === 1 && activeYear[0] !== 'all') ? activeYear[0] : years[0];
         
         const dataPoints = uniqueLocations.map(loc => {
-            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === activeYear && row[locKey] && row[locKey].toString().trim() === loc);
+            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString().trim() === activeYearVal && row[locKey] && row[locKey].toString().trim() === loc);
             const sum = matches.reduce((s, row) => s + getValue(row), 0);
-            return (sum / yearlyTotals[activeYear]) * 100;
+            return (sum / yearlyTotals[activeYearVal]) * 100;
         });
 
         chartDatasets = [{
@@ -79,12 +79,11 @@ function renderLocationChart(arg1, arg2) {
             borderRadius: 4
         }];
     } else if (isSingleLocation) {
-        // Case B: 1 Location selected -> Years on X-axis, showing raw actual counts
         chartLabels = years;
         const activeLoc = uniqueLocations[0];
 
         const dataPoints = years.map(year => {
-            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === activeLoc);
+            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString().trim() === year && row[locKey] && row[locKey].toString().trim() === activeLoc);
             return matches.reduce((s, row) => s + getValue(row), 0);
         });
 
@@ -95,11 +94,10 @@ function renderLocationChart(arg1, arg2) {
             borderRadius: 4
         }];
     } else {
-        // Case C: Multi-year & Multi-location -> Standard 100% Stacked Bar
         chartLabels = years;
         chartDatasets = uniqueLocations.map((loc, index) => {
             const dataPoints = years.map(year => {
-                const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString() === year && row[locKey] && row[locKey].toString().trim() === loc);
+                const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString().trim() === year && row[locKey] && row[locKey].toString().trim() === loc);
                 const sum = matches.reduce((s, row) => s + getValue(row), 0);
                 return (sum / yearlyTotals[year]) * 100;
             });
@@ -116,7 +114,32 @@ function renderLocationChart(arg1, arg2) {
     new Chart(ctx, {
         type: 'bar',
         data: { labels: chartLabels, datasets: chartDatasets },
+        plugins: [{
+            id: 'topLabels',
+            afterDatasetsDraw(chart) {
+                if (!useBarChart) return;
+                const ctx = chart.ctx;
+                chart.data.datasets.forEach((dataset, i) => {
+                    const meta = chart.getDatasetMeta(i);
+                    const total = dataset.data.reduce((a, b) => a + (parseFloat(b) || 0), 0);
+                    meta.data.forEach((bar, index) => {
+                        const data = dataset.data[index];
+                        if (data) {
+                            ctx.save();
+                            ctx.fillStyle = '#475569';
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'bottom';
+                            ctx.font = 'bold 11px sans-serif';
+                            const percentStr = total > 0 ? ((data / total) * 100).toFixed(1) + '%' : '0%';
+                            ctx.fillText(percentStr, bar.x, bar.y - 4);
+                            ctx.restore();
+                        }
+                    });
+                });
+            }
+        }],
         options: {
+            layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
@@ -129,14 +152,9 @@ function renderLocationChart(arg1, arg2) {
                     callbacks: { 
                         label: (context) => {
                             let labelStr = "";
-                            if (isSingleYear) {
-                                labelStr = Array.isArray(context.label) ? context.label.join(' ') : context.label;
-                            } else {
-                                labelStr = context.dataset.label || "Value";
-                            }
-                            return showPercentage 
-                                ? `${labelStr}: ${context.raw.toFixed(1)}%` 
-                                : `${labelStr}: ${context.raw.toLocaleString()}`;
+                            if (isSingleYear) labelStr = Array.isArray(context.label) ? context.label.join(' ') : context.label;
+                            else labelStr = context.dataset.label || "Value";
+                            return showPercentage ? `${labelStr}: ${context.raw.toFixed(1)}%` : `${labelStr}: ${context.raw.toLocaleString()}`;
                         } 
                     } 
                 }
