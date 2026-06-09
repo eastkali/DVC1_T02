@@ -40,8 +40,8 @@ function renderNormalizedChart(arg1, arg2, arg3) {
     let uniqueJurisdictions = [...new Set(filteredDataset.map(row => row[jurisKey]).filter(Boolean))].map(j => j.toString().trim()).sort();
     let years = [...new Set(filteredDataset.map(row => row[yearKey]).filter(Boolean))].map(y => y.toString()).sort();
 
-    const targetColors = window.okabeItoColors || ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
-    const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot'];
+    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
+    const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot', 'rectRounded'];
     
     const isSingleYear = years.length === 1;
 

@@ -44,8 +44,8 @@ function renderAgeGroupChart(arg1, arg2) {
         return k ? (parseFloat(row[k]) || 1) : 1;
     };
 
-    const targetColors = window.okabeItoColors || ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
-    const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot'];
+    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
+    const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot', 'rectRounded'];
     
     const isSingleYear = years.length === 1;
 
@@ -101,7 +101,7 @@ function renderAgeGroupChart(arg1, arg2) {
             responsive: true, maintainAspectRatio: false, 
             plugins: { 
                 legend: { 
-                    display: !isSingleYear,
+                    display: !isSingleYear, 
                     position: 'right', 
                     labels: { font: { size: 10 }, boxWidth: 12 } 
                 },
@@ -118,7 +118,7 @@ function renderAgeGroupChart(arg1, arg2) {
                 x: { 
                     title: { 
                         display: true, 
-                        text: isSingleYear ? 'Age Group' : 'Year',
+                        text: isSingleYear ? 'Age Group' : 'Year', 
                         font: { weight: 'bold' }, 
                         color: '#333' 
                     } 
