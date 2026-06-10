@@ -26,28 +26,31 @@ function renderNormalizedChart(arg1, arg2, arg3) {
     const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
     const normKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('10k') || k.toLowerCase().includes('count')) || 'COUNT_PER_10K';
 
+    const activeYearFilter = (filters.year || ['all']).map(v => v.toString().trim());
+    const activeJurisFilter = (filters.jurisdiction || ['all']).map(v => v.toString().trim());
+    
+    let activeAge = filters.age || filters.ageGroup || filters.age_group || ['all'];
+    const activeAgeFilter = activeAge.map(v => v.toString().trim());
+
     let filteredDataset = dataset.filter(row => {
-        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString().trim())) return false;
-        if (filters.jurisdiction && !filters.jurisdiction.includes('all') && row[jurisKey] && !filters.jurisdiction.includes(row[jurisKey].toString().trim())) return false;
-        
-        let activeAge = filters.age || filters.ageGroup || filters.age_group;
-        if (activeAge && !activeAge.includes('all') && row[ageKey] && !activeAge.includes(row[ageKey].toString().trim())) return false;
-        
+        if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
+        if (!activeJurisFilter.includes('all') && row[jurisKey] && !activeJurisFilter.includes(row[jurisKey].toString().trim())) return false;
+        if (!activeAgeFilter.includes('all') && ageKey && row[ageKey] && !activeAgeFilter.includes(row[ageKey].toString().trim())) return false;
         return true;
     });
 
     let uniqueJurisdictions = [...new Set(filteredDataset.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
-    let years = [...new Set(filteredDataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(Boolean))].sort();
+    let years = [...new Set(filteredDataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(Boolean))].sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, ''));
+        const numB = parseInt(b.replace(/\D/g, ''));
+        return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
+    });
 
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
     const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot', 'rectRounded'];
     
-    const activeYearFilter = filters.year || ['all'];
     const isSingleYear = (activeYearFilter.length === 1 && activeYearFilter[0] !== 'all') || years.length === 1;
-    
-    const activeJurisFilter = filters.jurisdiction || ['all'];
     const isSingleJurisdiction = (activeJurisFilter.length === 1 && activeJurisFilter[0] !== 'all') || uniqueJurisdictions.length === 1;
-    
     const useBarChart = isSingleYear || isSingleJurisdiction;
 
     let chartLabels = [];
@@ -110,34 +113,39 @@ function renderNormalizedChart(arg1, arg2, arg3) {
         });
     }
 
+    const barLabelPlugin = {
+        id: 'topLabels',
+        afterDatasetsDraw(chart) {
+            if (chart.config.type !== 'bar') return;
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((dataset, i) => {
+                const meta = chart.getDatasetMeta(i);
+                meta.data.forEach((bar, index) => {
+                    const data = dataset.data[index];
+                    if (data) {
+                        ctx.save();
+                        ctx.fillStyle = '#475569';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.font = 'bold 11px sans-serif';
+                        const textStr = data.toFixed(2);
+                        ctx.fillText(textStr, bar.x, bar.y - 4);
+                        ctx.restore();
+                    }
+                });
+            });
+        }
+    };
+
     new Chart(ctx, {
         type: useBarChart ? 'bar' : 'line',
         data: { labels: chartLabels, datasets: chartDatasets },
-        plugins: [{
-            id: 'topLabels',
-            afterDatasetsDraw(chart) {
-                if (chart.config.type !== 'bar') return;
-                const ctx = chart.ctx;
-                chart.data.datasets.forEach((dataset, i) => {
-                    const meta = chart.getDatasetMeta(i);
-                    const total = dataset.data.reduce((a, b) => a + (parseFloat(b) || 0), 0);
-                    meta.data.forEach((bar, index) => {
-                        const data = dataset.data[index];
-                        if (data) {
-                            ctx.save();
-                            ctx.fillStyle = '#475569';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'bottom';
-                            ctx.font = 'bold 11px sans-serif';
-                            const percentStr = total > 0 ? ((data / total) * 100).toFixed(1) + '%' : '0%';
-                            ctx.fillText(percentStr, bar.x, bar.y - 4);
-                            ctx.restore();
-                        }
-                    });
-                });
-            }
-        }],
+        plugins: useBarChart ? [barLabelPlugin] : [], 
         options: { 
+            interaction: {
+                mode: 'index',
+                intersect: true,
+            },
             layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true, maintainAspectRatio: false, 
             plugins: { 

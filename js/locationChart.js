@@ -1,4 +1,3 @@
-// js/locationChart.js
 function renderLocationChart(arg1, arg2) {
     let canvasId = 'locationChart';
     let dataset = arg1;
@@ -18,14 +17,21 @@ function renderLocationChart(arg1, arg2) {
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const locKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('loc')) || 'LOCATION';
 
+    const activeYearFilter = (filters.year || ['all']).map(v => v.toString().trim());
+    const activeLocFilter = (filters.location || ['all']).map(v => v.toString().trim());
+
     let filteredData = dataset.filter(row => {
-        if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString().trim())) return false;
-        if (filters.location && !filters.location.includes('all') && row[locKey] && !filters.location.includes(row[locKey].toString().trim())) return false;
+        if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
+        if (!activeLocFilter.includes('all') && row[locKey] && !activeLocFilter.includes(row[locKey].toString().trim())) return false;
         return true;
     });
 
-    let years = [...new Set(filteredData.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(y => y !== ''))].sort();
     let uniqueLocations = [...new Set(filteredData.map(row => row[locKey] ? row[locKey].toString().trim() : '').filter(l => l !== ''))].sort();
+    let years = [...new Set(filteredData.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(y => y !== ''))].sort((a, b) => {
+        const numA = parseInt(a.replace(/\D/g, ''));
+        const numB = parseInt(b.replace(/\D/g, ''));
+        return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
+    });
 
     const getValue = (row) => {
         const keys = Object.keys(row);
@@ -43,34 +49,31 @@ function renderLocationChart(arg1, arg2) {
             .reduce((sum, row) => sum + getValue(row), 0) || 1;
     });
 
-    // YOUR EXACT COLOR PALETTE
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
 
     const formatLegendLabel = (loc) => {
         if (loc === 'Major Cities of Australia') return ['Major Cities', 'of Australia'];
-        if (loc.endsWith(' Australia') && loc !== 'Australia') {
-            return [loc.replace(' Australia', ''), 'Australia'];
-        }
+        if (loc.endsWith(' Australia') && loc !== 'Australia') return [loc.replace(' Australia', ''), 'Australia'];
         return loc;
     };
 
-    const activeYear = filters.year || ['all'];
-    const isSingleYear = (activeYear.length === 1 && activeYear[0] !== 'all') || (years.length === 1);
-    const isSingleLocation = uniqueLocations.length === 1;
-    const useBarChart = isSingleYear || isSingleLocation;
-    const showPercentage = !isSingleLocation; // If only 1 location is selected, % is always 100. We switch to raw counts to show an actual trend.
+    const isSingleYear = (activeYearFilter.length === 1 && activeYearFilter[0] !== 'all') || years.length === 1;
+    const isSingleLocation = (activeLocFilter.length === 1 && activeLocFilter[0] !== 'all') || uniqueLocations.length === 1;
+    
+    const isStacked = !isSingleYear && !isSingleLocation; 
+    
+    const showPercentage = isStacked; 
 
     let chartLabels = [];
     let chartDatasets = [];
 
     if (isSingleYear) {
         chartLabels = uniqueLocations.map(loc => formatLegendLabel(loc));
-        const activeYearVal = (activeYear.length === 1 && activeYear[0] !== 'all') ? activeYear[0] : years[0];
+        const activeYearVal = years[0];
         
         const dataPoints = uniqueLocations.map(loc => {
             const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString().trim() === activeYearVal && row[locKey] && row[locKey].toString().trim() === loc);
-            const sum = matches.reduce((s, row) => s + getValue(row), 0);
-            return (sum / yearlyTotals[activeYearVal]) * 100;
+            return matches.reduce((s, row) => s + getValue(row), 0); // Plotting exact RAW NUMBER now
         });
 
         chartDatasets = [{
@@ -80,15 +83,15 @@ function renderLocationChart(arg1, arg2) {
         }];
     } else if (isSingleLocation) {
         chartLabels = years;
-        const activeLoc = uniqueLocations[0];
+        const activeLocVal = uniqueLocations[0];
 
         const dataPoints = years.map(year => {
-            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString().trim() === year && row[locKey] && row[locKey].toString().trim() === activeLoc);
+            const matches = filteredData.filter(row => row[yearKey] && row[yearKey].toString().trim() === year && row[locKey] && row[locKey].toString().trim() === activeLocVal);
             return matches.reduce((s, row) => s + getValue(row), 0);
         });
 
         chartDatasets = [{
-            label: Array.isArray(formatLegendLabel(activeLoc)) ? formatLegendLabel(activeLoc).join(' ') : formatLegendLabel(activeLoc),
+            label: Array.isArray(formatLegendLabel(activeLocVal)) ? formatLegendLabel(activeLocVal).join(' ') : formatLegendLabel(activeLocVal),
             data: dataPoints,
             backgroundColor: targetColors[0],
             borderRadius: 4
@@ -111,40 +114,42 @@ function renderLocationChart(arg1, arg2) {
         });
     }
 
+    const barLabelPlugin = {
+        id: 'topLabels',
+        afterDatasetsDraw(chart) {
+            if (isStacked) return; // Disables labels for the stacked chart so they don't overlap
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((dataset, i) => {
+                const meta = chart.getDatasetMeta(i);
+                meta.data.forEach((bar, index) => {
+                    const data = dataset.data[index];
+                    if (data !== undefined && data !== null) {
+                        ctx.save();
+                        ctx.fillStyle = '#475569';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'bottom';
+                        ctx.font = 'bold 11px sans-serif';
+                        const textStr = showPercentage ? data.toFixed(1) + '%' : data.toLocaleString();
+                        ctx.fillText(textStr, bar.x, bar.y - 4);
+                        ctx.restore();
+                    }
+                });
+            });
+        }
+    };
+
     new Chart(ctx, {
         type: 'bar',
         data: { labels: chartLabels, datasets: chartDatasets },
-        plugins: [{
-            id: 'topLabels',
-            afterDatasetsDraw(chart) {
-                if (!useBarChart) return;
-                const ctx = chart.ctx;
-                chart.data.datasets.forEach((dataset, i) => {
-                    const meta = chart.getDatasetMeta(i);
-                    const total = dataset.data.reduce((a, b) => a + (parseFloat(b) || 0), 0);
-                    meta.data.forEach((bar, index) => {
-                        const data = dataset.data[index];
-                        if (data) {
-                            ctx.save();
-                            ctx.fillStyle = '#475569';
-                            ctx.textAlign = 'center';
-                            ctx.textBaseline = 'bottom';
-                            ctx.font = 'bold 11px sans-serif';
-                            const percentStr = total > 0 ? ((data / total) * 100).toFixed(1) + '%' : '0%';
-                            ctx.fillText(percentStr, bar.x, bar.y - 4);
-                            ctx.restore();
-                        }
-                    });
-                });
-            }
-        }],
+        plugins: [barLabelPlugin],
         options: {
-            layout: { padding: { top: useBarChart ? 25 : 0 } },
+            interaction: { mode: 'index', intersect: true },
+            layout: { padding: { top: isStacked ? 0 : 25 } },
             responsive: true,
             maintainAspectRatio: false,
             plugins: { 
                 legend: { 
-                    display: !useBarChart, 
+                    display: isStacked, 
                     position: 'right',
                     labels: { font: { size: 10 }, boxWidth: 10, padding: 10 }
                 },
@@ -160,12 +165,12 @@ function renderLocationChart(arg1, arg2) {
                 }
             },
             scales: {
-                // Unstack bars  if a single year is selected
-                x: { stacked: !useBarChart },
+                x: { stacked: isStacked },
                 y: { 
-                    stacked: !useBarChart, 
-                    max: showPercentage && !useBarChart ? 100 : undefined, 
-                    ticks: { callback: v => showPercentage ? v + '%' : v.toLocaleString() } 
+                    stacked: isStacked, 
+                    max: showPercentage ? 100 : undefined, 
+                    ticks: { callback: v => showPercentage ? v + '%' : v.toLocaleString() },
+                    title: { display: true, text: showPercentage ? 'Percentage (%)' : 'Total Offenses', font: { weight: 'bold' }, color: '#333' } 
                 }
             }
         }
