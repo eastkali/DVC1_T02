@@ -1,4 +1,3 @@
-// js/locationChart.js
 function renderLocationChart(arg1, arg2) {
     let canvasId = 'locationChart';
     let dataset = arg1;
@@ -36,7 +35,7 @@ function renderLocationChart(arg1, arg2) {
         return k ? (parseFloat(row[k]) || 1) : 1;
     };
 
-    // Sort locations from biggest to smallest total value to structure the stacks cleanly
+    // Sort locations from biggest to smallest
     const locTotals = {};
     uniqueLocations.forEach(loc => {
         locTotals[loc] = filteredData
@@ -52,7 +51,6 @@ function renderLocationChart(arg1, arg2) {
             .reduce((sum, row) => sum + getValue(row), 0) || 1;
     });
 
-    // YOUR EXACT COLOR PALETTE
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
 
     const formatLegendLabel = (loc) => {
@@ -130,17 +128,18 @@ function renderLocationChart(arg1, arg2) {
                 const ctx = chart.ctx;
                 chart.data.datasets.forEach((dataset, i) => {
                     const meta = chart.getDatasetMeta(i);
-                    const total = dataset.data.reduce((a, b) => a + (parseFloat(b) || 0), 0);
                     meta.data.forEach((bar, index) => {
                         const data = dataset.data[index];
-                        if (data) {
+                        if (data !== undefined && data !== null) {
                             ctx.save();
                             ctx.fillStyle = '#475569';
                             ctx.textAlign = 'center';
                             ctx.textBaseline = 'bottom';
                             ctx.font = 'bold 11px sans-serif';
-                            const percentStr = total > 0 ? ((data / total) * 100).toFixed(1) + '%' : '0%';
-                            ctx.fillText(percentStr, bar.x, bar.y - 4);
+
+                            const labelValue = showPercentage ? data.toFixed(1) + '%' : data.toLocaleString();
+                            
+                            ctx.fillText(labelValue, bar.x, bar.y - 4);
                             ctx.restore();
                         }
                     });
