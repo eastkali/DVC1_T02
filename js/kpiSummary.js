@@ -22,10 +22,15 @@ function updateKPICards(containerId, dataset) {
         
         const keys = Object.keys(targetDataset[0] || {});
         
+        const yearKey = keys.find(k => k.toLowerCase() === 'year') || 'YEAR';
         const fineK = keys.find(k => k.toLowerCase().includes('fine'));
         const arrestK = keys.find(k => k.toLowerCase().includes('arrest'));
         const chargeK = keys.find(k => k.toLowerCase().includes('charge'));
         const offenseK = keys.find(k => k.toLowerCase().includes('offenses_sum') || k.toLowerCase() === 'offenses') || keys.find(k => k.toLowerCase().includes('total'));
+
+        const uniqueYears = [...new Set(targetDataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : ''))].filter(Boolean);
+        const yearCount = uniqueYears.length > 0 ? uniqueYears.length : 1;
+        const isMultiYear = yearCount > 1;
 
         targetDataset.forEach(row => {
             const f = fineK ? parseFloat(row[fineK]) || 0 : 0;
@@ -41,22 +46,38 @@ function updateKPICards(containerId, dataset) {
             totalOffenses += o;
         });
 
+        const displayOffenses = isMultiYear ? Math.round(totalOffenses / yearCount) : totalOffenses;
+        const displayFines = isMultiYear ? Math.round(totalFines / yearCount) : totalFines;
+        const displayArrests = isMultiYear ? Math.round(totalArrests / yearCount) : totalArrests;
+        const displayCharges = isMultiYear ? Math.round(totalCharges / yearCount) : totalCharges;
+
+        const offLabel = isMultiYear ? `AVG OF ${yearCount} YRS OFFENSES` : 'TOTAL OFFENSES';
+        const fineLabel = isMultiYear ? `AVG OF ${yearCount} YRS FINES` : 'TOTAL FINES';
+        const arrLabel = isMultiYear ? `AVG OF ${yearCount} YRS ARRESTS` : 'TOTAL ARRESTS';
+        const charLabel = isMultiYear ? `AVG OF ${yearCount} YRS CHARGES` : 'TOTAL CHARGES';
+
+        container.style.display = 'flex';
+        container.style.flexDirection = 'column';
+        container.style.height = '100%'; 
+        container.style.width = '100%';
+        container.style.overflow = 'hidden';
+
         container.innerHTML = `
-            <div style="width: 100%; text-align: center; padding: 2px 0; border-bottom: 1px solid #f0f0f0; background: #ffffff; color: #000000;">
-                <h1 style="font-size: 15px; font-weight: 700; margin: 0; color: #000000; line-height: 1.1;">${totalOffenses.toLocaleString()}</h1>
-                <span style="font-size: 9px; font-weight: 600; text-transform: uppercase; color: #666666; display: block; margin-top: 1px; letter-spacing: 0.3px; white-space: nowrap;">TOTAL OFFENSES</span>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 1px solid #f0f0f0; background: #ffffff; box-sizing: border-box; overflow: hidden; padding: 1px;">
+                <span style="font-size: 9px; font-weight: 700; color: #000000; line-height: 1;">${displayOffenses.toLocaleString()}</span>
+                <span style="font-size: 5.5px; font-weight: 600; text-transform: uppercase; color: #666666; margin-top: 1px; line-height: 1.1; text-align: center; padding: 0 2px;">${offLabel}</span>
             </div>
-            <div style="width: 100%; text-align: center; padding: 2px 0; border-bottom: 1px solid #f0f0f0; background: #ffffff; color: #000000;">
-                <h2 style="font-size: 14px; font-weight: 700; margin: 0; color: #000000; line-height: 1.1;">${totalFines.toLocaleString()}</h2>
-                <span style="font-size: 9px; font-weight: 600; text-transform: uppercase; color: #666666; display: block; margin-top: 1px; letter-spacing: 0.3px; white-space: nowrap;">FINES</span>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 1px solid #f0f0f0; background: #ffffff; box-sizing: border-box; overflow: hidden; padding: 1px;">
+                <span style="font-size: 9px; font-weight: 700; color: #000000; line-height: 1;">${displayFines.toLocaleString()}</span>
+                <span style="font-size: 5.5px; font-weight: 600; text-transform: uppercase; color: #666666; margin-top: 1px; line-height: 1.1; text-align: center; padding: 0 2px;">${fineLabel}</span>
             </div>
-            <div style="width: 100%; text-align: center; padding: 2px 0; border-bottom: 1px solid #f0f0f0; background: #ffffff; color: #000000;">
-                <h2 style="font-size: 14px; font-weight: 700; margin: 0; color: #000000; line-height: 1.1;">${totalArrests.toLocaleString()}</h2>
-                <span style="font-size: 9px; font-weight: 600; text-transform: uppercase; color: #666666; display: block; margin-top: 1px; letter-spacing: 0.3px; white-space: nowrap;">ARRESTS</span>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; border-bottom: 1px solid #f0f0f0; background: #ffffff; box-sizing: border-box; overflow: hidden; padding: 1px;">
+                <span style="font-size: 9px; font-weight: 700; color: #000000; line-height: 1;">${displayArrests.toLocaleString()}</span>
+                <span style="font-size: 5.5px; font-weight: 600; text-transform: uppercase; color: #666666; margin-top: 1px; line-height: 1.1; text-align: center; padding: 0 2px;">${arrLabel}</span>
             </div>
-            <div style="width: 100%; text-align: center; padding: 2px 0; background: #ffffff; color: #000000;">
-                <h2 style="font-size: 14px; font-weight: 700; margin: 0; color: #000000; line-height: 1.1;">${totalCharges.toLocaleString()}</h2>
-                <span style="font-size: 9px; font-weight: 600; text-transform: uppercase; color: #666666; display: block; margin-top: 1px; letter-spacing: 0.3px; white-space: nowrap;">CHARGES</span>
+            <div style="flex: 1; display: flex; flex-direction: column; justify-content: center; align-items: center; background: #ffffff; box-sizing: border-box; overflow: hidden; padding: 1px;">
+                <span style="font-size: 9px; font-weight: 700; color: #000000; line-height: 1;">${displayCharges.toLocaleString()}</span>
+                <span style="font-size: 5.5px; font-weight: 600; text-transform: uppercase; color: #666666; margin-top: 1px; line-height: 1.1; text-align: center; padding: 0 2px;">${charLabel}</span>
             </div>
         `;
     } catch (error) {
