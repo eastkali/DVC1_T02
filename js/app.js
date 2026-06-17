@@ -35,15 +35,8 @@ window.checkDataAndToggle = function(chartId, data) {
         noDataMsg.style.textAlign = 'center';
         noDataMsg.style.padding = '20px';
         noDataMsg.style.boxSizing = 'border-box';
-        if (chartId == "chart-normalized") {
-            noDataMsg.innerText = 'No data available for the selected filters. Jurisdiction data normalized by license holders is can only be filtered by years and jurisdiction.';
-        }
-        else 
-            {
-            noDataMsg.innerText = 'No data available for the selected filters. Location and age group data is only available for years after 2023.';
-        }
+        noDataMsg.innerText = 'No data available for the selected filters';
 
-        
         container.appendChild(noDataMsg);
     }
 
@@ -231,7 +224,6 @@ window.renderDashboardCharts = function() {
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
     if (filters.year.includes('all') || filters.year.every(y => masterYearsSet.has(y))){
-        console.log("enter if")
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     } else {
@@ -239,7 +231,6 @@ window.renderDashboardCharts = function() {
         fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
     }
 
-    
 
     if (window.checkDataAndToggle('chart-method', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('chart-method', fDetection);
     if (window.checkDataAndToggle('chart-jurisdiction', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('chart-jurisdiction', fJurisdiction);
