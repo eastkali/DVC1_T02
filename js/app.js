@@ -12,7 +12,7 @@ if (typeof Chart !== 'undefined') {
 window.checkDataAndToggle = function(chartId, data) {
     const canvas = document.getElementById(chartId);
     if (!canvas) return false;
-    console.log(chartId)
+
     const container = canvas.parentElement;
     let noDataMsg = container.querySelector('.no-data-overlay');
     
@@ -192,6 +192,8 @@ window.loadTopicData = function(topic) {
     ]).then(([license, main, loc_age]) => {
         
         window.rawDatasets = { license, main, loc_age };
+        const years = [...new Set(main.map(d => d.YEAR))].sort((a,b)=>b-a);
+
         if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
         window.renderDashboardCharts();
     }).catch(err => {
@@ -222,11 +224,22 @@ window.renderDashboardCharts = function() {
     if (!window.rawDatasets.main) return;
 
     const filters = window.getActiveFilters();
+    const yearsWithLocAge = [...new Set(window.rawDatasets.loc_age.map(d => d.YEAR))].sort((a,b)=>b-a);
+    const masterYearsSet = new Set(yearsWithLocAge);
+
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
-    const fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
-    const fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
+    if (filters.year.includes('all') || filters.year.every(y => masterYearsSet.has(y))){
+        console.log("enter if")
+        fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
+        fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
+    } else {
+        fLocation = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
+        fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
+    }
+
+    
 
     if (window.checkDataAndToggle('chart-method', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('chart-method', fDetection);
     if (window.checkDataAndToggle('chart-jurisdiction', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('chart-jurisdiction', fJurisdiction);
