@@ -207,21 +207,19 @@ function renderDetectionChart(canvasId, dataset) {
             },
             scales: {
                 x: { 
-                    stacked: !useBarChart,
                     title: { display: true, text: useBarChart && isSingleYear && !isSingleMethod ? 'Detection Method' : 'Year', font: { weight: 'bold' }, color: '#333' },
                     display: true,
                     grid: {
                         display: true,          
                         drawOnChartArea: true,  
                         drawTicks: true,       
-                        offset: false                                      
+                        offset: useBarChart                       
                     },
                     ticks: {
-                        autoSkip: false         
+                        autoSkip: true       
                     }
                 },
                 y: { 
-                    stacked: !useBarChart, 
                     beginAtZero: true,
                     title: { display: true, text: 'Total Offenses', font: { weight: 'bold' }, color: '#333' }
                 }

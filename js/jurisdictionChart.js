@@ -1,7 +1,4 @@
-function renderJurisdictionChart(arg1, arg2) {
-    let canvasId = 'jurisdictionChart';
-    let dataset = arg1;
-    if (arg2 !== undefined) { canvasId = arg1; dataset = arg2; }
+function renderJurisdictionChart(canvasId, dataset) {
     if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
 
     let ctx = document.getElementById(canvasId);
@@ -11,38 +8,40 @@ function renderJurisdictionChart(arg1, arg2) {
     let existingChart = Chart.getChart(ctx);
     if (existingChart) existingChart.destroy();
 
-    const filters = window.getActiveFilters ? window.getActiveFilters() : { year: ['all'], jurisdiction: ['all'], age: ['all'] };
-
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
-    const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
+    // const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
 
-    const activeYearFilter = (filters.year || ['all']).map(v => v.toString().trim());
-    const activeJurisFilter = (filters.jurisdiction || ['all']).map(v => v.toString().trim());
+    // const activeYearFilter = (filters.year || ['all']).map(v => v.toString().trim());
+    // const activeJurisFilter = (filters.jurisdiction || ['all']).map(v => v.toString().trim());
     
-    let activeAge = filters.age || filters.ageGroup || filters.age_group || ['all'];
-    const activeAgeFilter = activeAge.map(v => v.toString().trim());
+    // let activeAge = filters.age || filters.ageGroup || filters.age_group || ['all'];
+    // const activeAgeFilter = activeAge.map(v => v.toString().trim());
 
-    let filteredDataset = dataset.filter(row => {
-        if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
-        if (!activeJurisFilter.includes('all') && row[jurisKey] && !activeJurisFilter.includes(row[jurisKey].toString().trim())) return false;
-        if (!activeAgeFilter.includes('all') && ageKey && row[ageKey] && !activeAgeFilter.includes(row[ageKey].toString().trim())) return false;
-        return true;
-    });
+    // let dataset = dataset.filter(row => {
+    //     if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
+    //     if (!activeJurisFilter.includes('all') && row[jurisKey] && !activeJurisFilter.includes(row[jurisKey].toString().trim())) return false;
+        // if (!activeAgeFilter.includes('all') && ageKey && row[ageKey] && !activeAgeFilter.includes(row[ageKey].toString().trim())) return false;
+    //     return true;
+    // });
 
-    let uniqueJurisdictions = [...new Set(filteredDataset.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
-    let years = [...new Set(filteredDataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(Boolean))].sort((a, b) => {
-        const numA = parseInt(a.replace(/\D/g, ''));
-        const numB = parseInt(b.replace(/\D/g, ''));
+    const selectedJurisdictions = [...new Set(dataset.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
+    const allJurisdictions = [...new Set(window.rawDatasets.main.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
+
+    console.log(dataset)
+    const selectedYears = [...new Set(dataset.map(row => row[yearKey]?.toString().trim()))].filter(Boolean).sort((a, b) => {
+        const numA = parseInt(a);
+        const numB = parseInt(b);
         return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
     });
+    // console.log(selectedYears)
 
     const getValue = (row) => {
         const keys = Object.keys(row);
         const k = keys.find(key => {
             const l = key.toLowerCase();
-            return l.includes('offen') || l.includes('total') || l.includes('count') || l.includes('fine');
+            return l.includes('offenses') ;
         });
         return k ? (parseFloat(row[k]) || 1) : 1;
     };
@@ -50,33 +49,33 @@ function renderJurisdictionChart(arg1, arg2) {
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
     const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot', 'rectRounded'];
     
-    const isSingleYear = (activeYearFilter.length === 1 && activeYearFilter[0] !== 'all') || years.length === 1;
-    const isSingleJurisdiction = (activeJurisFilter.length === 1 && activeJurisFilter[0] !== 'all') || uniqueJurisdictions.length === 1;
+    const isSingleYear = selectedYears.length === 1;
+    const isSingleJurisdiction = selectedJurisdictions.length === 1;
     const useBarChart = isSingleYear || isSingleJurisdiction;
 
     let chartLabels = [];
     let chartDatasets = [];
 
     if (isSingleYear) {
-        chartLabels = uniqueJurisdictions;
-        const activeYearVal = years.length === 1 ? years[0] : activeYearFilter[0];
+        chartLabels = selectedJurisdictions;
+        const activeYearVal = selectedYears[0];
 
-        const dataPoints = uniqueJurisdictions.map(juris => {
-            const matches = filteredDataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === activeYearVal);
+        const dataPoints = selectedJurisdictions.map(juris => {
+            const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === activeYearVal);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
         chartDatasets = [{
             data: dataPoints,
-            backgroundColor: uniqueJurisdictions.map((_, index) => targetColors[index % targetColors.length]),
+            backgroundColor: selectedJurisdictions.map((_, index) => targetColors[index % targetColors.length]),
             borderRadius: 4
         }];
     } else if (isSingleJurisdiction) {
-        chartLabels = years;
-        const activeJurisVal = uniqueJurisdictions.length === 1 ? uniqueJurisdictions[0] : activeJurisFilter[0];
+        chartLabels = selectedYears;
+        const activeJurisVal = selectedJurisdictions.length === 1 ? selectedJurisdictions[0] : activeJurisFilter[0];
 
-        const dataPoints = years.map(year => {
-            const matches = filteredDataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === activeJurisVal && row[yearKey] && row[yearKey].toString().trim() === year);
+        const dataPoints = selectedYears.map(year => {
+            const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === activeJurisVal && row[yearKey] && row[yearKey].toString().trim() === year);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
@@ -87,18 +86,24 @@ function renderJurisdictionChart(arg1, arg2) {
             borderRadius: 4
         }];
     } else {
-        chartLabels = years;
-        chartDatasets = uniqueJurisdictions.map((juris, index) => {
-            const dataPoints = years.map(year => {
-                const matches = filteredDataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === year);
-                return matches.reduce((sum, row) => sum + getValue(row), 0);
+        chartLabels = selectedYears;
+        // console.log(chartLabels)
+
+
+        selectedJurisdictions.forEach(jurisdiction => {
+            const color = targetColors[allJurisdictions.indexOf(jurisdiction) % targetColors.length];
+            const shape = targetShapes[allJurisdictions.indexOf(jurisdiction) % targetShapes.length];
+
+
+            const dataPoints = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[jurisKey] && row[jurisKey].toString().trim() === jurisdiction && row[yearKey] && row[yearKey].toString().trim() === year)
+                    .reduce((sum, row) => sum + getValue(row), 0);
             });
-            
-            const color = targetColors[index % targetColors.length];
-            const shape = targetShapes[index % targetShapes.length];
-            
-            return { 
-                label: juris, 
+            console.log(dataPoints)
+
+            chartDatasets.push({
+                label: jurisdiction, 
                 data: dataPoints, 
                 borderColor: color, 
                 backgroundColor: color, 
@@ -110,8 +115,34 @@ function renderJurisdictionChart(arg1, arg2) {
                 pointBorderWidth: 2, 
                 fill: false, 
                 tension: 0.1 
-            };
+            });
         });
+
+        // chartDatasets = allJurisdictions.map((juris, index) => {
+        //     const dataPoints = selectedYears.map(year => {
+        //         const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === year);
+        //         return matches.reduce((sum, row) => sum + getValue(row), 0);
+        //     });
+        //     console.log(dataPoints)
+            
+        //     const color = targetColors[index % targetColors.length];
+        //     const shape = targetShapes[index % targetShapes.length];
+            
+        //     return { 
+        //         label: juris, 
+        //         data: dataPoints, 
+        //         borderColor: color, 
+        //         backgroundColor: color, 
+        //         pointBackgroundColor: 'transparent', 
+        //         pointBorderColor: color,
+        //         pointStyle: shape, 
+        //         pointRadius: 4,                  
+        //         pointHoverRadius: 6, 
+        //         pointBorderWidth: 2, 
+        //         fill: false, 
+        //         tension: 0.1 
+        //     };
+        // });
     }
 
     const barLabelPlugin = {
@@ -145,7 +176,7 @@ function renderJurisdictionChart(arg1, arg2) {
         options: { 
             interaction: {
                 mode: 'index',
-                intersect: true,
+                intersect: false,
             },
             layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true, maintainAspectRatio: false, 
@@ -166,7 +197,16 @@ function renderJurisdictionChart(arg1, arg2) {
             }, 
             scales: { 
                 x: { 
-                    title: { display: true, text: isSingleYear ? 'Jurisdiction' : 'Year', font: { weight: 'bold' }, color: '#333' } 
+                    title: { display: true, text: isSingleYear ? 'Jurisdiction' : 'Year', font: { weight: 'bold' }, color: '#333' } ,
+                    grid: {
+                        display: true,          
+                        drawOnChartArea: true,  
+                        drawTicks: true,       
+                        offset: false                                      
+                    },
+                    ticks: {
+                        autoSkip: true         
+                    }
                 },
                 y: { 
                     beginAtZero: true, 
