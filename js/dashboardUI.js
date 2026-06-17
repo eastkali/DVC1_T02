@@ -196,7 +196,7 @@ window.fillSelect = function(elementId, items) {
                 <strong>All</strong>
             </label>
             ${items.map(item => {
-                if (!item || item === 'Unknown') return '';
+                // if (!item || item === 'Unknown') return '';
                 return `
                     <label style="display: flex; align-items: center; padding: 6px 12px; margin: 0; cursor: pointer; font-size: 13px; color: #334155;">
                         <input type="checkbox" class="filter-checkbox-item" value="${item}" style="margin-right: 8px; cursor: pointer;">

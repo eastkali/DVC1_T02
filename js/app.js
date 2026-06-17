@@ -12,7 +12,7 @@ if (typeof Chart !== 'undefined') {
 window.checkDataAndToggle = function(chartId, data) {
     const canvas = document.getElementById(chartId);
     if (!canvas) return false;
-    
+    console.log(chartId)
     const container = canvas.parentElement;
     let noDataMsg = container.querySelector('.no-data-overlay');
     
@@ -35,7 +35,15 @@ window.checkDataAndToggle = function(chartId, data) {
         noDataMsg.style.textAlign = 'center';
         noDataMsg.style.padding = '20px';
         noDataMsg.style.boxSizing = 'border-box';
-        noDataMsg.innerText = 'No data available for the selected filters.';
+        if (chartId == "chart-normalized") {
+            noDataMsg.innerText = 'No data available for the selected filters. Jurisdiction data normalized by license holders is can only be filtered by years and jurisdiction.';
+        }
+        else 
+            {
+            noDataMsg.innerText = 'No data available for the selected filters. Location and age group data is only available for years after 2023.';
+        }
+
+        
         container.appendChild(noDataMsg);
     }
 
@@ -116,8 +124,13 @@ window.getActiveFilters = function() {
         const allCheckbox = el.querySelector('.filter-checkbox-all');
         if (allCheckbox && allCheckbox.checked) return ['all'];
 
-        const checkboxes = el.querySelectorAll('.filter-checkbox-item:checked');
-        const values = Array.from(checkboxes).map(cb => cb.value);
+        const allItems = el.querySelectorAll('.filter-checkbox-item');
+        const checkedItems = el.querySelectorAll('.filter-checkbox-item:checked');
+        if (allItems.length > 0 && allItems.length === checkedItems.length) {
+            return ['all'];
+        }
+        
+        const values = Array.from(checkedItems).map(cb => cb.value);
         
         return values.length === 0 ? ['all'] : values;
     }
@@ -132,7 +145,9 @@ window.getActiveFilters = function() {
 };
 
 window.getFilteredData = function(dataArray, filters) {
+    
     if (!dataArray || !Array.isArray(dataArray)) return dataArray;
+    
     
     return dataArray.filter(row => {
         const keys = Object.keys(row);
@@ -143,7 +158,6 @@ window.getFilteredData = function(dataArray, filters) {
         const ageKey = keys.find(k => k.toLowerCase().includes('age'));
         const methodKey = keys.find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
 
-        // STRICT FILTERING: Hide data if the column doesn't exist to prevent fake totals
         if (filters.year && !filters.year.includes('all')) {
             if (!yearKey || !filters.year.includes(row[yearKey].toString().trim())) return false;
         }
@@ -172,21 +186,12 @@ window.loadTopicData = function(topic) {
     if (topic.includes('mobile') || topic === 'mp') prefix = 'mp';
 
     Promise.all([
-        d3.csv(`data/${prefix}_jurisdiction.csv`),
-        d3.csv(`data/${prefix}_location.csv`),
-        d3.csv(`data/${prefix}_age.csv`),
-        d3.csv(`data/${prefix}_detection.csv`),
-        d3.csv(`data/${prefix}_license.csv`) 
-    ]).then(([jurisdiction, location, age, detection, license]) => {
+        d3.csv(`data/${prefix}_license.csv`),
+        d3.csv(`data/${prefix}_main.csv`),
+        d3.csv(`data/${prefix}_loc_age.csv`)  
+    ]).then(([license, main, loc_age]) => {
         
-        if (detection) {
-            detection = detection.filter(d => {
-                const methodKey = Object.keys(d).find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
-                return methodKey && d[methodKey] && d[methodKey].trim().toLowerCase() !== 'unknown';
-            });
-        }
-
-        window.rawDatasets = { jurisdiction, location, age, detection, license };
+        window.rawDatasets = { license, main, loc_age };
         if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
         window.renderDashboardCharts();
     }).catch(err => {
@@ -196,43 +201,38 @@ window.loadTopicData = function(topic) {
 
 window.populateDynamicDropdowns = function() {
     const ds = window.rawDatasets;
-    if (!ds.jurisdiction) return;
+    if (!ds.main) return;
 
-    const years = [...new Set(ds.jurisdiction.map(d => d.YEAR))].sort((a,b)=>b-a);
-    const locations = [...new Set(ds.location.map(d => d.LOCATION))].sort();
-    const ages = [...new Set(ds.age.map(d => d.AGE_GROUP))].sort();
+    const years = [...new Set(ds.main.map(d => d.YEAR))].sort((a,b)=>b-a);
+    const locations = [...new Set(ds.loc_age.map(d => d.LOCATION))].sort();
+    const ages = [...new Set(ds.loc_age.map(d => d.AGE_GROUP))].sort();
+    const methods = [...new Set(ds.main.map(d => d.DETECTION_METHOD))].sort();
+    const jurisdictions = [...new Set(ds.main.map(d => d.JURISDICTION))].sort();
     
-    // Check detection method column name dynamically
-    let methods = [];
-    if (ds.detection && ds.detection.length > 0) {
-        const mKey = Object.keys(ds.detection[0]).find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
-        if (mKey) methods = [...new Set(ds.detection.map(d => d[mKey]))].sort();
-    }
-
     if(typeof window.fillSelect === 'function') {
         window.fillSelect('filter-year', years);
         window.fillSelect('filter-location', locations);
         window.fillSelect('filter-age', ages);
         window.fillSelect('filter-method', methods);
-        window.fillSelect('filter-jurisdiction', ['NSW', 'VIC', 'QLD', 'WA', 'SA', 'TAS', 'ACT', 'NT']);
+        window.fillSelect('filter-jurisdiction', jurisdictions);
     }
 };
 
 window.renderDashboardCharts = function() {
-    if (!window.rawDatasets.jurisdiction) return;
+    if (!window.rawDatasets.main) return;
 
     const filters = window.getActiveFilters();
-    const fJurisdiction = window.getFilteredData(window.rawDatasets.jurisdiction, filters);
-    const fDetection = window.getFilteredData(window.rawDatasets.detection, filters);
-    const fLocation = window.getFilteredData(window.rawDatasets.location, filters);
-    const fAge = window.getFilteredData(window.rawDatasets.age, filters);
+    const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
+    const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
+    const fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
+    const fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
 
     if (window.checkDataAndToggle('chart-method', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('chart-method', fDetection);
     if (window.checkDataAndToggle('chart-jurisdiction', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('chart-jurisdiction', fJurisdiction);
     if (window.checkDataAndToggle('chart-location', fLocation) && typeof renderLocationChart === 'function') renderLocationChart('chart-location', fLocation);
     if (window.checkDataAndToggle('chart-age', fAge) && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('chart-age', fAge);
-    if (window.checkDataAndToggle('chart-normalized', fJurisdiction) && typeof renderNormalizedChart === 'function') renderNormalizedChart('chart-normalized', fJurisdiction, fLicense);
+    if (window.checkDataAndToggle('chart-normalized', fLicense) && typeof renderNormalizedChart === 'function') renderNormalizedChart('chart-normalized', fLicense);
     
     const kpiContainer = document.getElementById('offenseLevelKpiContainer');
     if (kpiContainer) {
