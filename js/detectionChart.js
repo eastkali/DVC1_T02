@@ -19,6 +19,8 @@ function renderDetectionChart(canvasId, dataset) {
     const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
     const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
+
+
     const selectedMethods = [...new Set(dataset.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
     const allMethods = [...new Set(window.rawDatasets.main.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
 
@@ -116,6 +118,7 @@ function renderDetectionChart(canvasId, dataset) {
                     .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
             });
             
+
             chartDatasets.push({
                 type: 'bar',
                 label: method,
@@ -293,7 +296,7 @@ function renderDetectionChart(canvasId, dataset) {
                         offset: useBarChart  
                     },
                     ticks: {
-                        autoSkip: false       
+                        autoSkip: true       
                     }
                 },
                 y: { 

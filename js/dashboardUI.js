@@ -99,10 +99,10 @@ window.openDataTableModal = function(chartId) {
     let data = [];
     const filters = window.getActiveFilters();
     
-    if (chartId === 'method') data = window.getFilteredData(window.rawDatasets.detection, filters);
-    else if (chartId === 'jurisdiction' || chartId === 'normalized') data = window.getFilteredData(window.rawDatasets.jurisdiction, filters);
-    else if (chartId === 'location') data = window.getFilteredData(window.rawDatasets.location, filters);
-    else if (chartId === 'age') data = window.getFilteredData(window.rawDatasets.age, filters);
+    if (chartId === 'method') data = window.getFilteredData(window.rawDatasets.main, filters);
+    else if (chartId === 'jurisdiction' || chartId === 'normalized') data = window.getFilteredData(window.rawDatasets.main, filters);
+    else if (chartId === 'location') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
+    else if (chartId === 'age') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
 
     if (!data || data.length === 0) {
         document.getElementById('data-table-title').innerText = config ? config.title : 'Data Table';
@@ -146,10 +146,10 @@ window.openModal = function(chartId) {
     if (!window.rawDatasets.jurisdiction) return;
 
     const filters = window.getActiveFilters();
-    const fJurisdiction = window.getFilteredData(window.rawDatasets.jurisdiction, filters);
-    const fDetection = window.getFilteredData(window.rawDatasets.detection, filters);
-    const fLocation = window.getFilteredData(window.rawDatasets.location, filters);
-    const fAge = window.getFilteredData(window.rawDatasets.age, filters);
+    const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
+    const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
+    const fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
+    const fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
 
     if (chartId === 'method') {
