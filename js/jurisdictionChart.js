@@ -11,6 +11,9 @@ function renderJurisdictionChart(canvasId, dataset) {
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
+    const finesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('fines'));
+    const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
+    const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
     const selectedJurisdictions = [...new Set(dataset.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
     const allJurisdictions = [...new Set(window.rawDatasets.main.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
@@ -27,7 +30,7 @@ function renderJurisdictionChart(canvasId, dataset) {
             const l = key.toLowerCase();
             return l.includes('offenses') ;
         });
-        return k ? (parseFloat(row[k]) || 1) : 1;
+        return (parseFloat(row[k]))? (parseFloat(row[k])) : 0;
     };
 
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
@@ -49,25 +52,67 @@ function renderJurisdictionChart(canvasId, dataset) {
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
+        const finesValues = selectedJurisdictions.map(juris => {
+            return dataset
+                .filter(row => row[jurisKey]?.toString().trim() === juris)
+                .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+        });
+
+        const arrestsValues = selectedJurisdictions.map(juris => {
+            return dataset
+                .filter(row => row[jurisKey]?.toString().trim() === juris)
+                .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+        });
+
+        const chargesValues = selectedJurisdictions.map(juris => {
+            return dataset
+                .filter(row => row[jurisKey]?.toString().trim() === juris)
+                .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+        });
+
         chartDatasets = [{
             data: dataPoints,
             backgroundColor: selectedJurisdictions.map((_, index) => targetColors[index % targetColors.length]),
-            borderRadius: 4
+            borderRadius: 4,
+            fines: finesValues,
+            arrests: arrestsValues,
+            charges: chargesValues,
         }];
     } else if (isSingleJurisdiction) {
         chartLabels = selectedYears;
-        const activeJurisVal = selectedJurisdictions.length === 1 ? selectedJurisdictions[0] : activeJurisFilter[0];
+        const activeJurisVal = selectedJurisdictions[0];
 
         const dataPoints = selectedYears.map(year => {
             const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === activeJurisVal && row[yearKey] && row[yearKey].toString().trim() === year);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
+        const finesValues = selectedYears.map(year => {
+            return dataset
+                .filter(row => row[yearKey]?.toString().trim() === year)
+                .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+        });
+
+        const arrestsValues = selectedYears.map(year => {
+            return dataset
+                .filter(row => row[yearKey]?.toString().trim() === year)
+                .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+        });
+
+        const chargesValues = selectedYears.map(year => {
+            return dataset
+                .filter(row => row[yearKey]?.toString().trim() === year)
+                .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+        });
+
         chartDatasets = [{
             label: activeJurisVal,
             data: dataPoints,
             backgroundColor: targetColors[0],
-            borderRadius: 4
+            borderRadius: 4,
+            fines: finesValues,
+            arrests: arrestsValues,
+            charges: chargesValues,
         }];
     } else {
         chartLabels = selectedYears;
@@ -142,8 +187,8 @@ function renderJurisdictionChart(canvasId, dataset) {
         plugins: useBarChart ? [barLabelPlugin] : [], 
         options: { 
             interaction: {
-                mode: 'index',
-                intersect: false,
+                mode: useBarChart ? 'x' : 'index',
+                intersect: false
             },
             layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true, maintainAspectRatio: false, 
@@ -158,7 +203,24 @@ function renderJurisdictionChart(canvasId, dataset) {
                     callbacks: {
                         label: (context) => {
                             let labelStr = useBarChart && isSingleYear ? context.label : context.dataset.label;
+
+                            if (useBarChart) {
+                                const datasetObj = context.dataset;
+                                const index = context.dataIndex; 
+
+                                const fines = (datasetObj.fines?.[index] || 0).toLocaleString();
+                                const arrests = (datasetObj.arrests?.[index] || 0).toLocaleString();
+                                const charges = (datasetObj.charges?.[index] || 0).toLocaleString();
+
+                                return [
+                                    `${labelStr}: ${context.raw.toLocaleString()}`,
+                                    `  • Fines Collected: ${fines}`,
+                                    `  • Total Arrests: ${arrests}`,
+                                    `  • Charges Filed: ${charges}`
+                                ];
+                            } else {
                             return `${labelStr}: ${context.raw % 1 !== 0 ? context.raw.toFixed(2) : context.raw.toLocaleString()}`;
+                            }
                         }
                     }
                 }
@@ -173,7 +235,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                         offset: useBarChart                                      
                     },
                     ticks: {
-                        autoSkip: true         
+                        autoSkip: false         
                     }
                 },
                 y: { 

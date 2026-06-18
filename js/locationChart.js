@@ -11,6 +11,9 @@ function renderLocationChart(canvasId, dataset) {
     const firstRow = dataset[0];
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const locKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('loc')) || 'LOCATION';
+    const finesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('fines'));
+    const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
+    const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
     let selectedYears = [...new Set(dataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(y => y !== ''))].sort();
 
@@ -22,7 +25,7 @@ function renderLocationChart(canvasId, dataset) {
             const l = key.toLowerCase();
             return l.includes('offenses') ;
         });
-        return k ? (parseFloat(row[k]) || 1) : 1;
+        return (parseFloat(row[k]))? (parseFloat(row[k])) : 0;
     };
 
     // Sort locations from biggest to smallest
@@ -69,10 +72,32 @@ function renderLocationChart(canvasId, dataset) {
             return (sum / yearlyTotals[activeYearVal]) * 100;
         });
 
+        const finesValues = selectedLocations.map(loc => {
+                return dataset
+                    .filter(row => row[locKey]?.toString().trim() === loc && row[yearKey]?.toString().trim() === activeYearVal)
+                    .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+            });
+
+            const arrestsValues = selectedLocations.map(loc => {
+                return dataset
+                    .filter(row => row[locKey]?.toString().trim() === loc && row[yearKey]?.toString().trim() === activeYearVal)
+                    .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+            });
+
+            const chargesValues = selectedLocations.map(loc => {
+                return dataset
+                    .filter(row => row[locKey]?.toString().trim() === loc && row[yearKey]?.toString().trim() === activeYearVal)
+                    .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+            });
+            
+
         chartDatasets = [{
             data: dataPoints,
             backgroundColor: selectedLocations.map((_, index) => targetColors[index % targetColors.length]),
-            borderRadius: 4
+            borderRadius: 4,
+            fines: finesValues,
+            arrests: arrestsValues,
+            charges: chargesValues,            
         }];
     } else if (isSingleLocation) {
         chartLabels = selectedYears;
@@ -83,11 +108,32 @@ function renderLocationChart(canvasId, dataset) {
             return matches.reduce((s, row) => s + getValue(row), 0);
         });
 
+        const finesValues = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[yearKey]?.toString().trim() === year)
+                    .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+            });
+
+            const arrestsValues = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[yearKey]?.toString().trim() === year)
+                    .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+            });
+
+            const chargesValues = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[yearKey]?.toString().trim() === year)
+                    .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+            });
+
         chartDatasets = [{
             label: Array.isArray(formatLegendLabel(activeLoc)) ? formatLegendLabel(activeLoc).join(' ') : formatLegendLabel(activeLoc),
             data: dataPoints,
             backgroundColor: targetColors[0],
-            borderRadius: 4
+            borderRadius: 4,
+            fines: finesValues,
+            arrests: arrestsValues,
+            charges: chargesValues,
         }];
     } else {
         chartLabels = selectedYears;
@@ -147,8 +193,8 @@ function renderLocationChart(canvasId, dataset) {
         }],
         options: {
             interaction: {
-                mode: 'index',
-                intersect: false,
+                mode: useBarChart ? 'x' : 'index',
+                intersect: false
             },
             layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true,
@@ -164,15 +210,51 @@ function renderLocationChart(canvasId, dataset) {
                     callbacks: { 
                         label: (context) => {
                             let labelStr = "";
-                            if (isSingleYear) labelStr = Array.isArray(context.label) ? context.label.join(' ') : context.label;
-                            else labelStr = context.dataset.label || "Value";
-                            return showPercentage ? `${labelStr}: ${context.raw.toFixed(1)}%` : `${labelStr}: ${context.raw.toLocaleString()}`;
+                            if (useBarChart) {
+                                labelStr = Array.isArray(context.label) ? context.label.join(' ') : context.label;
+
+                                const datasetObj = context.dataset;
+                                const index = context.dataIndex; 
+
+                                
+                                const fines = datasetObj.fines?.[index] || 0;
+                                const arrests = datasetObj.arrests?.[index] || 0;
+                                const charges = datasetObj.charges?.[index] || 0;
+                                const sum = fines + arrests +charges;
+
+                                const finesStr = fines.toLocaleString();
+                                const arrestsStr = arrests.toLocaleString();
+                                const chargesStr = charges.toLocaleString();
+                                const sumStr = sum.toLocaleString();
+
+                                return [
+                                    `${labelStr}: ${sumStr}`,
+                                    `  • Fines Collected: ${finesStr}`,
+                                    `  • Total Arrests: ${arrestsStr}`,
+                                    `  • Charges Filed: ${chargesStr}`
+                                ];
+
+                            } else {
+                                labelStr = context.dataset.label || "Value";
+                                return showPercentage ? `${labelStr}: ${context.raw.toFixed(1)}%` : `${labelStr}: ${context.raw.toLocaleString()}`;
+                        }
                         } 
                     } 
                 }
             },
             scales: {
-                x: { stacked: !useBarChart },
+                x: { 
+                    stacked: !useBarChart,
+                    grid: {
+                        display: true,         
+                        drawOnChartArea: true,  
+                        drawTicks: true,       
+                        offset: useBarChart  
+                    },
+                    ticks: {
+                        autoSkip: false       
+                    }
+                },
                 y: { 
                     stacked: !useBarChart, 
                     max: showPercentage && !useBarChart ? 100 : undefined, 

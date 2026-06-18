@@ -10,12 +10,14 @@ function renderAgeGroupChart(canvasId, dataset) {
 
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
-    const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
     const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
+    const finesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('fines'));
+    const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
+    const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
     let selectedAges = [...new Set(dataset.map(row => row[ageKey] ? row[ageKey].toString().trim() : '').filter(Boolean))].sort();
     let allAges = [...new Set(window.rawDatasets.loc_age.map(row => row[ageKey] ? row[ageKey].toString().trim() : '').filter(Boolean))].sort();
-    let years = [...new Set(dataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(Boolean))].sort((a, b) => {
+    let selectedYears = [...new Set(dataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(Boolean))].sort((a, b) => {
         const numA = parseInt(a);
         const numB = parseInt(b);
         return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
@@ -27,13 +29,13 @@ function renderAgeGroupChart(canvasId, dataset) {
             const l = key.toLowerCase();
             return l.includes('offenses');
         });
-        return k ? (parseFloat(row[k]) || 1) : 1;
+        return (parseFloat(row[k]))? (parseFloat(row[k])) : 0;
     };
 
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
     const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot', 'rectRounded'];
     
-    const isSingleYear = years.length === 1;
+    const isSingleYear = selectedYears.length === 1;
     const isSingleAge = selectedAges.length === 1;
     const useBarChart = isSingleYear || isSingleAge;
 
@@ -41,42 +43,85 @@ function renderAgeGroupChart(canvasId, dataset) {
     let chartDatasets = [];
 
     if (isSingleYear) {
-        chartLabels = allAges;
-        const activeYearVal = years[0];
+        chartLabels = selectedAges;
+        const activeYearVal = selectedYears[0];
 
-        const dataPoints = allAges.map(age => {
+        const dataPoints = selectedAges.map(age => {
             const matches = dataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === age && row[yearKey] && row[yearKey].toString().trim() === activeYearVal);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
         });
 
+        const finesValues = selectedAges.map(age => {
+            return dataset
+                .filter(row => row[ageKey]?.toString().trim() === age)
+                .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+        });
+
+        const arrestsValues = selectedAges.map(age => {
+            return dataset
+                .filter(row => row[ageKey]?.toString().trim() === age)
+                .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+        });
+
+        const chargesValues = selectedAges.map(age => {
+            return dataset
+                .filter(row => row[ageKey]?.toString().trim() === age)
+                .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+        });
+     
+
         chartDatasets = [{
             data: dataPoints,
             backgroundColor: selectedAges.map((_, index) => targetColors[index % targetColors.length]),
-            borderRadius: 4
+            borderRadius: 4,
+            fines: finesValues,
+            arrests: arrestsValues,
+            charges: chargesValues,
         }];
     } else if (isSingleAge) {
-        chartLabels = years;
-        const activeAgeVal = selectedAges.length === 1 ? selectedAges[0] : activeAgeFilter[0];
+        chartLabels = selectedYears;
+        const activeAgeVal = selectedAges[0];
 
-        const dataPoints = years.map(year => {
+        const dataPoints = selectedYears.map(year => {
             const matches = dataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === activeAgeVal && row[yearKey] && row[yearKey].toString().trim() === year);
             return matches.reduce((sum, row) => sum + getValue(row), 0);
+        });
+
+        const finesValues = selectedYears.map(year => {
+            return dataset
+                .filter(row => row[yearKey]?.toString().trim() === year)
+                .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+        });
+
+        const arrestsValues = selectedYears.map(year => {
+            return dataset
+                .filter(row => row[yearKey]?.toString().trim() === year)
+                .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+        });
+
+        const chargesValues = selectedYears.map(year => {
+            return dataset
+                .filter(row => row[yearKey]?.toString().trim() === year)
+                .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
         });
 
         chartDatasets = [{
             label: activeAgeVal,
             data: dataPoints,
             backgroundColor: targetColors[0],
-            borderRadius: 4
+            borderRadius: 4,
+            fines: finesValues,
+            arrests: arrestsValues,
+            charges: chargesValues,
         }];
     } else {
-        chartLabels = years;
+        chartLabels = selectedYears;
         
         selectedAges.forEach(age => {
             const color = targetColors[allAges.indexOf(age) % targetColors.length];
             const shape = targetShapes[allAges.indexOf(age) % targetShapes.length];
 
-           const dataPoints = years.map(year => {
+           const dataPoints = selectedYears.map(year => {
                 return dataset
                     .filter(row => row[ageKey] && row[ageKey].toString().trim() === age && row[yearKey] && row[yearKey].toString().trim() === year)
                    .reduce((sum, row) => sum + getValue(row), 0)
@@ -141,7 +186,10 @@ function renderAgeGroupChart(canvasId, dataset) {
         data: { labels: chartLabels, datasets: chartDatasets },
         plugins: useBarChart ? [barLabelPlugin] : [], 
         options: { 
-            interaction: { mode: 'index', intersect: false },
+            interaction: {
+                 mode: useBarChart ? 'x' : 'index',
+                 intersect: false 
+            },
             layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true, maintainAspectRatio: false, 
             plugins: { 
@@ -155,14 +203,40 @@ function renderAgeGroupChart(canvasId, dataset) {
                     callbacks: {
                         label: (context) => {
                             let labelStr = useBarChart && isSingleYear ? context.label : context.dataset.label;
-                            return `${labelStr}: ${context.raw % 1 !== 0 ? context.raw.toFixed(2) : context.raw.toLocaleString()}`;
+
+                            if (useBarChart) {
+                                const datasetObj = context.dataset;
+                                const index = context.dataIndex; 
+
+                                const fines = (datasetObj.fines?.[index] || 0).toLocaleString();
+                                const arrests = (datasetObj.arrests?.[index] || 0).toLocaleString();
+                                const charges = (datasetObj.charges?.[index] || 0).toLocaleString();
+
+                                return [
+                                    `${labelStr}: ${context.raw.toLocaleString()}`,
+                                    `  • Fines Collected: ${fines}`,
+                                    `  • Total Arrests: ${arrests}`,
+                                    `  • Charges Filed: ${charges}`
+                                ];
+                            } else {
+                                return `${labelStr}: ${context.raw % 1 !== 0 ? context.raw.toFixed(2) : context.raw.toLocaleString()}`;
+                            }
                         }
                     }
                 }
             },
             scales: { 
                 x: { 
-                    title: { display: true, text: isSingleYear ? 'Age Group' : 'Year', font: { weight: 'bold' }, color: '#333' } 
+                    title: { display: true, text: isSingleYear ? 'Age Group' : 'Year', font: { weight: 'bold' }, color: '#333' },
+                    grid: {
+                        display: true,          
+                        drawOnChartArea: true,  
+                        drawTicks: true,       
+                        offset: useBarChart                                      
+                    },
+                    ticks: {
+                        autoSkip: false         
+                    }
                 },
                 y: { 
                     beginAtZero: true, 

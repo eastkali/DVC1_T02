@@ -1,15 +1,6 @@
-function renderNormalizedChart(arg1, arg2, arg3) {
-    let canvasId = 'normalizedChart';
-    let dataset = null;
-
-    if (typeof arg1 === 'string') {
-        canvasId = arg1;
-        dataset = arg3 || arg2; 
-    } else {
-        dataset = arg2 || arg1;
-    }
-
+function renderNormalizedChart(canvasId, dataset) {
     if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
+
 
     let ctx = document.getElementById(canvasId);
     if (!ctx) ctx = document.querySelector('canvas[id*="normalized"]');

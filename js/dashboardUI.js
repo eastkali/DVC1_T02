@@ -23,7 +23,7 @@ window.buildDashboardGrid = function() {
                     #offenseLevelKpiContainer h3, #offenseLevelKpiContainer h4, #offenseLevelKpiContainer h5, #offenseLevelKpiContainer h6, #offenseLevelKpiContainer .label, #offenseLevelKpiContainer .kpi-label, #offenseLevelKpiContainer span:not([style*="font-size"]) { font-size: 11px !important; text-transform: uppercase !important; letter-spacing: 0.3px !important; line-height: 1.2 !important; text-align: center !important; margin: 0 auto !important; font-weight: 600 !important; display: block !important; opacity: 0.85; white-space: normal !important;}
                 </style>
                 <div class="chart-header" style="padding: 4px 0 8px 0; border-bottom: 1px solid #eee; justify-content: center;">
-                    <h3 style="font-size: 13px; margin: 0; text-align: center; font-weight: 600;">Summary</h3>
+                    <h3 style="font-size: 13px; margin: 0; text-align: center; font-weight: 600;">Summary for data from available filters</h3>
                 </div>
                 <div class="canvas-container" id="offenseLevelKpiContainer" style="flex-grow: 1; padding: 8px 0 0 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; box-sizing: border-box; position: relative;"></div>
             </div>

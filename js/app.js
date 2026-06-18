@@ -36,7 +36,7 @@ window.checkDataAndToggle = function(chartId, data) {
         noDataMsg.style.padding = '20px';
         noDataMsg.style.boxSizing = 'border-box';
         noDataMsg.innerText = 'No data available for the selected filters';
-
+                
         container.appendChild(noDataMsg);
     }
 
@@ -218,12 +218,12 @@ window.renderDashboardCharts = function() {
 
     const filters = window.getActiveFilters();
     const yearsWithLocAge = [...new Set(window.rawDatasets.loc_age.map(d => d.YEAR))].sort((a,b)=>b-a);
-    const masterYearsSet = new Set(yearsWithLocAge);
+    const masterYearsSetWithLocAge = new Set(yearsWithLocAge);
 
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
-    if (filters.year.includes('all') || filters.year.every(y => masterYearsSet.has(y))){
+    if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     } else {
@@ -240,11 +240,11 @@ window.renderDashboardCharts = function() {
     
     const kpiContainer = document.getElementById('offenseLevelKpiContainer');
     if (kpiContainer) {
-        let activeKpiData = [];
         
-        if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
-        else if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
+        if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
         else if (fAge && fAge.length > 0) activeKpiData = fAge;
+        else if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
+        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
         else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
 
         if (activeKpiData.length === 0) {

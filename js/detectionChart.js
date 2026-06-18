@@ -15,8 +15,9 @@ function renderDetectionChart(canvasId, dataset) {
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const methodKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('detect') || k.toLowerCase().includes('method')) || 'DETECTION_METHOD';
     const offenseKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('offense') || k.toLowerCase().includes('total') || k.toLowerCase().includes('count')) || 'OFFENSES';
-
-
+    const finesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('fines'));
+    const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
+    const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
     const selectedMethods = [...new Set(dataset.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
     const allMethods = [...new Set(window.rawDatasets.main.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
@@ -51,6 +52,25 @@ function renderDetectionChart(canvasId, dataset) {
                     .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
             });
 
+            const finesValues = allMethods.map(method => {
+                return dataset
+                    .filter(row => row[methodKey]?.toString().trim() === method)
+                    .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+            });
+
+            const arrestsValues = allMethods.map(method => {
+                return dataset
+                    .filter(row => row[methodKey]?.toString().trim() === method)
+                    .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+            });
+
+            const chargesValues = allMethods.map(method => {
+                return dataset
+                    .filter(row => row[methodKey]?.toString().trim() === method)
+                    .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+            });
+            
+
             const barColors = selectedMethods.map(method => {
                 return targetColors[allMethods.indexOf(method) % targetColors.length];
             });
@@ -62,7 +82,10 @@ function renderDetectionChart(canvasId, dataset) {
                 backgroundColor: barColors,
                 borderColor: barColors,
                 borderWidth: 1,
-                borderRadius: 4
+                borderRadius: 4,
+                fines: finesValues,
+                arrests: arrestsValues,
+                charges: chargesValues,
             });
         } else {
             chartLabels = selectedYears;
@@ -75,6 +98,24 @@ function renderDetectionChart(canvasId, dataset) {
                     .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
             });
 
+            const finesValues = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[yearKey]?.toString().trim() === year)
+                    .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+            });
+
+            const arrestsValues = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[yearKey]?.toString().trim() === year)
+                    .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
+            });
+
+            const chargesValues = selectedYears.map(year => {
+                return dataset
+                    .filter(row => row[yearKey]?.toString().trim() === year)
+                    .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
+            });
+            
             chartDatasets.push({
                 type: 'bar',
                 label: method,
@@ -82,7 +123,10 @@ function renderDetectionChart(canvasId, dataset) {
                 backgroundColor: color,
                 borderColor: color,
                 borderWidth: 1,
-                borderRadius: 4
+                borderRadius: 4,
+                fines: finesValues,
+                arrests: arrestsValues,
+                charges: chargesValues,
             });
         }
     } else {
@@ -153,14 +197,14 @@ function renderDetectionChart(canvasId, dataset) {
             y: eventPosition.y
         };
     };
-    
+
     new Chart(ctx, {
         data: { labels: chartLabels, datasets: chartDatasets },
         plugins: useBarChart ? [barLabelPlugin] : [],
         options: {
             interaction: {
-                mode: 'index',     
-                intersect: false   
+                mode: useBarChart ? 'x' : 'index',
+                intersect: false
             },
             layout: { padding: { top: useBarChart ? 25 : 0 } },
             responsive: true,
@@ -214,7 +258,25 @@ function renderDetectionChart(canvasId, dataset) {
                     callbacks: {
                         label: (context) => {
                             let labelStr = useBarChart && isSingleYear && !isSingleMethod ? context.label : context.dataset.label;
-                            return `${labelStr}: ${context.raw.toLocaleString()}`;
+
+                            if (useBarChart) {
+                                const datasetObj = context.dataset;
+                                const index = context.dataIndex; 
+
+                                const fines = (datasetObj.fines?.[index] || 0).toLocaleString();
+                                const arrests = (datasetObj.arrests?.[index] || 0).toLocaleString();
+                                const charges = (datasetObj.charges?.[index] || 0).toLocaleString();
+
+                                return [
+                                    `${labelStr}: ${context.raw.toLocaleString()}`,
+                                    `  • Fines Collected: ${fines}`,
+                                    `  • Total Arrests: ${arrests}`,
+                                    `  • Charges Filed: ${charges}`
+                                ];
+                            } else {
+                                return `${labelStr}: ${context.raw.toLocaleString()}`;
+                            }
+                           
                         }
                     }
                 }
@@ -231,7 +293,7 @@ function renderDetectionChart(canvasId, dataset) {
                         offset: useBarChart  
                     },
                     ticks: {
-                        autoSkip: true       
+                        autoSkip: false       
                     }
                 },
                 y: { 
