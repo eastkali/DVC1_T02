@@ -8,22 +8,13 @@ function renderLocationChart(canvasId, dataset) {
     let existingChart = Chart.getChart(ctx);
     if (existingChart) existingChart.destroy();
 
-    // const filters = window.getActiveFilters ? window.getActiveFilters() : { year: ['all'], location: ['all'] };
-    
     const firstRow = dataset[0];
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const locKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('loc')) || 'LOCATION';
 
-    // let dataset = dataset.filter(row => {
-    //     if (filters.year && !filters.year.includes('all') && row[yearKey] && !filters.year.includes(row[yearKey].toString().trim())) return false;
-    //     if (filters.location && !filters.location.includes('all') && row[locKey] && !filters.location.includes(row[locKey].toString().trim())) return false;
-    //     return true;
-    // });
-
     let selectedYears = [...new Set(dataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(y => y !== ''))].sort();
 
     let selectedLocations = [...new Set(dataset.map(row => row[locKey] ? row[locKey].toString().trim() : '').filter(l => l !== ''))];
-    // let allLocations = [...new Set(dataset.map(row => row[locKey] ? row[locKey].toString().trim() : '').filter(l => l !== ''))];
 
     const getValue = (row) => {
         const keys = Object.keys(row);
@@ -55,7 +46,7 @@ function renderLocationChart(canvasId, dataset) {
     const formatLegendLabel = (loc) => {
         if (loc === 'Major Cities of Australia') return ['Major Cities', 'of Australia'];
         if (loc.endsWith(' Australia') && loc !== 'Australia') {
-            return [loc.replace(' Australia', ''), 'Australia'];
+            return [loc.replace(' Australia', ''), ' Australia'];
         }
         return loc;
     };
@@ -70,6 +61,7 @@ function renderLocationChart(canvasId, dataset) {
 
     if (isSingleYear) {
         chartLabels = selectedLocations.map(loc => formatLegendLabel(loc));
+        const activeYearVal = selectedYears[0];
         
         const dataPoints = selectedLocations.map(loc => {
             const matches = dataset.filter(row => row[yearKey] && row[yearKey].toString().trim() === activeYearVal && row[locKey] && row[locKey].toString().trim() === loc);
@@ -114,6 +106,16 @@ function renderLocationChart(canvasId, dataset) {
             };
         });
     }
+    Chart.Tooltip.positioners.cursor = function(elements, eventPosition) {
+        if (!eventPosition || eventPosition.x === undefined || eventPosition.y === undefined) {
+            return false;
+        }
+
+        return {
+            x: eventPosition.x,
+            y: eventPosition.y
+        };
+    };
 
     new Chart(ctx, {
         type: 'bar',
@@ -155,9 +157,10 @@ function renderLocationChart(canvasId, dataset) {
                 legend: { 
                     display: !useBarChart, 
                     position: 'right',
-                    labels: { font: { size: 10 }, boxWidth: 10, padding: 10 }
+                    labels: { font: { size: 10 }, boxWidth: 12, padding: 8 }
                 },
                 tooltip: { 
+                    position: 'cursor',
                     callbacks: { 
                         label: (context) => {
                             let labelStr = "";
