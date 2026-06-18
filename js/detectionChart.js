@@ -129,11 +129,13 @@ function renderDetectionChart(canvasId, dataset) {
                     if (dataVal !== undefined && dataVal !== null && dataVal >= 0) {
                         ctx.save();
                         ctx.fillStyle = '#333333';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'bottom';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
                         ctx.font = 'bold 11px sans-serif';
                         const textStr = dataVal % 1 !== 0 ? dataVal.toFixed(2) : dataVal.toLocaleString();
-                        ctx.fillText(textStr, bar.x, bar.y - 4);
+                        ctx.translate(bar.x, bar.y);
+                        ctx.rotate(-Math.PI / 2);
+                        ctx.fillText(textStr, 6, 0);
                         ctx.restore();
                     }
                 });
@@ -141,6 +143,17 @@ function renderDetectionChart(canvasId, dataset) {
         }
     };
 
+    Chart.Tooltip.positioners.cursor = function(elements, eventPosition) {
+        if (!eventPosition || eventPosition.x === undefined || eventPosition.y === undefined) {
+            return false;
+        }
+
+        return {
+            x: eventPosition.x,
+            y: eventPosition.y
+        };
+    };
+    
     new Chart(ctx, {
         data: { labels: chartLabels, datasets: chartDatasets },
         plugins: useBarChart ? [barLabelPlugin] : [],
@@ -197,6 +210,7 @@ function renderDetectionChart(canvasId, dataset) {
                     }
                 },
                 tooltip: {
+                    position: 'cursor',
                     callbacks: {
                         label: (context) => {
                             let labelStr = useBarChart && isSingleYear && !isSingleMethod ? context.label : context.dataset.label;
@@ -207,19 +221,21 @@ function renderDetectionChart(canvasId, dataset) {
             },
             scales: {
                 x: { 
+                    stacked: !useBarChart, 
                     title: { display: true, text: useBarChart && isSingleYear && !isSingleMethod ? 'Detection Method' : 'Year', font: { weight: 'bold' }, color: '#333' },
                     display: true,
                     grid: {
-                        display: true,          
+                        display: true,         
                         drawOnChartArea: true,  
                         drawTicks: true,       
-                        offset: useBarChart                       
+                        offset: useBarChart  
                     },
                     ticks: {
                         autoSkip: true       
                     }
                 },
                 y: { 
+                    stacked: !useBarChart, 
                     beginAtZero: true,
                     title: { display: true, text: 'Total Offenses', font: { weight: 'bold' }, color: '#333' }
                 }

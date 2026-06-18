@@ -11,31 +11,15 @@ function renderJurisdictionChart(canvasId, dataset) {
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
-    // const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
-
-    // const activeYearFilter = (filters.year || ['all']).map(v => v.toString().trim());
-    // const activeJurisFilter = (filters.jurisdiction || ['all']).map(v => v.toString().trim());
-    
-    // let activeAge = filters.age || filters.ageGroup || filters.age_group || ['all'];
-    // const activeAgeFilter = activeAge.map(v => v.toString().trim());
-
-    // let dataset = dataset.filter(row => {
-    //     if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
-    //     if (!activeJurisFilter.includes('all') && row[jurisKey] && !activeJurisFilter.includes(row[jurisKey].toString().trim())) return false;
-        // if (!activeAgeFilter.includes('all') && ageKey && row[ageKey] && !activeAgeFilter.includes(row[ageKey].toString().trim())) return false;
-    //     return true;
-    // });
 
     const selectedJurisdictions = [...new Set(dataset.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
     const allJurisdictions = [...new Set(window.rawDatasets.main.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
 
-    console.log(dataset)
     const selectedYears = [...new Set(dataset.map(row => row[yearKey]?.toString().trim()))].filter(Boolean).sort((a, b) => {
         const numA = parseInt(a);
         const numB = parseInt(b);
         return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
     });
-    // console.log(selectedYears)
 
     const getValue = (row) => {
         const keys = Object.keys(row);
@@ -87,20 +71,16 @@ function renderJurisdictionChart(canvasId, dataset) {
         }];
     } else {
         chartLabels = selectedYears;
-        // console.log(chartLabels)
-
 
         selectedJurisdictions.forEach(jurisdiction => {
             const color = targetColors[allJurisdictions.indexOf(jurisdiction) % targetColors.length];
             const shape = targetShapes[allJurisdictions.indexOf(jurisdiction) % targetShapes.length];
-
 
             const dataPoints = selectedYears.map(year => {
                 return dataset
                     .filter(row => row[jurisKey] && row[jurisKey].toString().trim() === jurisdiction && row[yearKey] && row[yearKey].toString().trim() === year)
                     .reduce((sum, row) => sum + getValue(row), 0);
             });
-            console.log(dataPoints)
 
             chartDatasets.push({
                 label: jurisdiction, 
@@ -117,32 +97,6 @@ function renderJurisdictionChart(canvasId, dataset) {
                 tension: 0.1 
             });
         });
-
-        // chartDatasets = allJurisdictions.map((juris, index) => {
-        //     const dataPoints = selectedYears.map(year => {
-        //         const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === year);
-        //         return matches.reduce((sum, row) => sum + getValue(row), 0);
-        //     });
-        //     console.log(dataPoints)
-            
-        //     const color = targetColors[index % targetColors.length];
-        //     const shape = targetShapes[index % targetShapes.length];
-            
-        //     return { 
-        //         label: juris, 
-        //         data: dataPoints, 
-        //         borderColor: color, 
-        //         backgroundColor: color, 
-        //         pointBackgroundColor: 'transparent', 
-        //         pointBorderColor: color,
-        //         pointStyle: shape, 
-        //         pointRadius: 4,                  
-        //         pointHoverRadius: 6, 
-        //         pointBorderWidth: 2, 
-        //         fill: false, 
-        //         tension: 0.1 
-        //     };
-        // });
     }
 
     const barLabelPlugin = {
@@ -157,16 +111,29 @@ function renderJurisdictionChart(canvasId, dataset) {
                     if (data) {
                         ctx.save();
                         ctx.fillStyle = '#475569';
-                        ctx.textAlign = 'center';
-                        ctx.textBaseline = 'bottom';
+                        ctx.textAlign = 'left';
+                        ctx.textBaseline = 'middle';
                         ctx.font = 'bold 11px sans-serif';
                         const textStr = data % 1 !== 0 ? data.toFixed(2) : data.toLocaleString();
-                        ctx.fillText(textStr, bar.x, bar.y - 4);
+                        ctx.translate(bar.x, bar.y);
+                        ctx.rotate(-Math.PI / 2);
+                        ctx.fillText(textStr, 6, 0);
                         ctx.restore();
                     }
                 });
             });
         }
+    };
+    
+    Chart.Tooltip.positioners.cursor = function(elements, eventPosition) {
+        if (!eventPosition || eventPosition.x === undefined || eventPosition.y === undefined) {
+            return false;
+        }
+
+        return {
+            x: eventPosition.x,
+            y: eventPosition.y
+        };
     };
 
     new Chart(ctx, {
@@ -187,6 +154,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                     labels: { font: { size: 10 }, boxWidth: 12 } 
                 },
                 tooltip: {
+                    position: 'cursor',
                     callbacks: {
                         label: (context) => {
                             let labelStr = useBarChart && isSingleYear ? context.label : context.dataset.label;
@@ -202,7 +170,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                         display: true,          
                         drawOnChartArea: true,  
                         drawTicks: true,       
-                        offset: false                                      
+                        offset: useBarChart                                      
                     },
                     ticks: {
                         autoSkip: true         
