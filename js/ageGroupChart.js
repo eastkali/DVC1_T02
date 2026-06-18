@@ -8,25 +8,10 @@ function renderAgeGroupChart(canvasId, dataset) {
     let existingChart = Chart.getChart(ctx);
     if (existingChart) existingChart.destroy();
 
-
-
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
     const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
-
-    // const activeYearFilter = (dataset.year || ['all']).map(v => v.toString().trim());
-    // const activeJurisFilter = (dataset.jurisdiction || ['all']).map(v => v.toString().trim());
-    
-    // let activeAge = dataset.age || dataset.ageGroup || dataset.age_group || ['all'];
-    // const activeAgeFilter = activeAge.map(v => v.toString().trim());
-
-    // let filteredDataset = dataset.filter(row => {
-    //     if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
-    //     if (!activeJurisFilter.includes('all') && row[jurisKey] && !activeJurisFilter.includes(row[jurisKey].toString().trim())) return false;
-    //     if (!activeAgeFilter.includes('all') && ageKey && row[ageKey] && !activeAgeFilter.includes(row[ageKey].toString().trim())) return false;
-    //     return true;
-    // });
 
     let selectedAges = [...new Set(dataset.map(row => row[ageKey] ? row[ageKey].toString().trim() : '').filter(Boolean))].sort();
     let allAges = [...new Set(window.rawDatasets.loc_age.map(row => row[ageKey] ? row[ageKey].toString().trim() : '').filter(Boolean))].sort();
