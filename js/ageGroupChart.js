@@ -81,6 +81,7 @@ function renderAgeGroupChart(canvasId, dataset) {
     } else if (isSingleAge) {
         chartLabels = selectedYears;
         const activeAgeVal = selectedAges[0];
+        const color = targetColors[allAges.indexOf(activeAgeVal) % targetColors.length];
 
         const dataPoints = selectedYears.map(year => {
             const matches = dataset.filter(row => row[ageKey] && row[ageKey].toString().trim() === activeAgeVal && row[yearKey] && row[yearKey].toString().trim() === year);
@@ -108,7 +109,7 @@ function renderAgeGroupChart(canvasId, dataset) {
         chartDatasets = [{
             label: activeAgeVal,
             data: dataPoints,
-            backgroundColor: targetColors[0],
+            backgroundColor: color,
             borderRadius: 4,
             fines: finesValues,
             arrests: arrestsValues,

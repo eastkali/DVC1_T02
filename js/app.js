@@ -186,6 +186,7 @@ window.loadTopicData = function(topic) {
         
         window.rawDatasets = { license, main, loc_age };
         const years = [...new Set(main.map(d => d.YEAR))].sort((a,b)=>b-a);
+        console.log(window.rawDatasets.license)
 
         if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
         window.renderDashboardCharts();

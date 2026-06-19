@@ -81,6 +81,7 @@ function renderJurisdictionChart(canvasId, dataset) {
     } else if (isSingleJurisdiction) {
         chartLabels = selectedYears;
         const activeJurisVal = selectedJurisdictions[0];
+        const color = targetColors[allJurisdictions.indexOf(activeJurisVal) % targetColors.length];
 
         const dataPoints = selectedYears.map(year => {
             const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === activeJurisVal && row[yearKey] && row[yearKey].toString().trim() === year);
@@ -108,7 +109,7 @@ function renderJurisdictionChart(canvasId, dataset) {
         chartDatasets = [{
             label: activeJurisVal,
             data: dataPoints,
-            backgroundColor: targetColors[0],
+            backgroundColor: color,
             borderRadius: 4,
             fines: finesValues,
             arrests: arrestsValues,
