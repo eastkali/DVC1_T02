@@ -143,13 +143,21 @@ window.openModal = function(chartId) {
     document.getElementById('modal-title').innerText = config ? config.title : 'Chart View';
     document.getElementById('modal-chart-container').innerHTML = `<canvas id="modal-canvas"></canvas>`;
     
-    if (!window.rawDatasets.jurisdiction) return;
+    if (!window.rawDatasets.main) return;
 
     const filters = window.getActiveFilters();
+    const yearsWithLocAge = [...new Set(window.rawDatasets.loc_age.map(d => d.YEAR))].sort((a,b)=>b-a);
+    const masterYearsSetWithLocAge = new Set(yearsWithLocAge);
+
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
-    const fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
-    const fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
+    if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
+        fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
+        fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
+    } else {
+        fLocation = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
+        fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
+    }
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
 
     if (chartId === 'method') {
@@ -161,7 +169,7 @@ window.openModal = function(chartId) {
     } else if (chartId === 'age') {
         if(window.checkDataAndToggle('modal-canvas', fAge) && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('modal-canvas', fAge);
     } else if (chartId === 'normalized') {
-        if(window.checkDataAndToggle('modal-canvas', fJurisdiction) && typeof renderNormalizedChart === 'function') renderNormalizedChart('modal-canvas', fJurisdiction, fLicense);
+        if(window.checkDataAndToggle('modal-canvas', fLicense) && typeof renderNormalizedChart === 'function') renderNormalizedChart('modal-canvas', fLicense);
     }
 
     setTimeout(window.enforceInteractiveHighlight, 150);

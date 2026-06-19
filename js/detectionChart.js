@@ -19,8 +19,6 @@ function renderDetectionChart(canvasId, dataset) {
     const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
     const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
-
-
     const selectedMethods = [...new Set(dataset.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
     const allMethods = [...new Set(window.rawDatasets.main.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
 

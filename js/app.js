@@ -186,6 +186,7 @@ window.loadTopicData = function(topic) {
         
         window.rawDatasets = { license, main, loc_age };
         const years = [...new Set(main.map(d => d.YEAR))].sort((a,b)=>b-a);
+        console.log(window.rawDatasets.license)
 
         if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
         window.renderDashboardCharts();
@@ -241,11 +242,10 @@ window.renderDashboardCharts = function() {
     const kpiContainer = document.getElementById('offenseLevelKpiContainer');
     if (kpiContainer) {
         
-        if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
+        if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
+        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
+        else if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
         else if (fAge && fAge.length > 0) activeKpiData = fAge;
-        else if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
-        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
-        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
 
         if (activeKpiData.length === 0) {
             kpiContainer.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#64748b; font-weight:bold; font-size:14px; text-align:center; padding: 20px;">No data available for the selected filters.</div>';
