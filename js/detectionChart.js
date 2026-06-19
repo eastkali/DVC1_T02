@@ -135,6 +135,14 @@ function renderDetectionChart(canvasId, dataset) {
     } else {
         chartLabels = selectedYears;
 
+        const yearlyGrandTotals = selectedYears.map(year => {
+            return dataset
+                .filter(row => 
+                    row[yearKey]?.toString().trim() === year && 
+                    selectedMethods.includes(row[methodKey]?.toString().trim())
+                )
+                .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
+        });
         selectedMethods.forEach(method => {
             const baseColor = targetColors[allMethods.indexOf(method) % targetColors.length];
             let displayColor = baseColor;
@@ -159,7 +167,8 @@ function renderDetectionChart(canvasId, dataset) {
                 pointBorderColor: displayColor,
                 tension: 0.1,
                 pointRadius: 3,
-                pointHoverRadius: 6
+                pointHoverRadius: 6,
+                yearlyGrandTotals: yearlyGrandTotals
             });
         });
     }
@@ -259,6 +268,18 @@ function renderDetectionChart(canvasId, dataset) {
                 tooltip: {
                     position: 'cursor',
                     callbacks: {
+                        title: (context) => {
+                            if (!useBarChart) {     
+                                const firstItem = context[0];                           
+                                const datasetObj = firstItem.dataset;
+                                const index = firstItem.dataIndex; 
+                                
+                                const yearLabel = firstItem.label
+                                const yearTotal = (datasetObj.yearlyGrandTotals?.[index] || 0).toLocaleString();
+
+                                return `${yearLabel} total: ${yearTotal}`
+                            }
+                        },
                         label: (context) => {
                             let labelStr = useBarChart && isSingleYear && !isSingleMethod ? context.label : context.dataset.label;
 
@@ -277,7 +298,7 @@ function renderDetectionChart(canvasId, dataset) {
                                     `  • Charges Filed: ${charges}`
                                 ];
                             } else {
-                                return `${labelStr}: ${context.raw.toLocaleString()}`;
+                                return `${labelStr}: ${context.raw.toLocaleString()}`
                             }
                            
                         }
