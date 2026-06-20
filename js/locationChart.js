@@ -35,8 +35,26 @@ function renderLocationChart(canvasId, dataset) {
     const isSingleLocation = selectedLocations.length === 1;
     const useBarChart = isSingleYear || isSingleLocation;
 
-    const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
-    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
+    const titleText = (!isSingleYear && isSingleLocation) ? 'Annual Offenses by Location' : 'Annual Offenses by Location (%)';
+    if (canvas.id === 'modal-canvas') {
+        const modalTitle = document.getElementById('modal-title');
+        if (modalTitle && modalTitle.innerText.includes('Location')) modalTitle.innerText = titleText;
+    } else {
+        const cardContainer = canvas.closest('.chart-card');
+        if (cardContainer) {
+            const titleEl = cardContainer.querySelector('.chart-header h3');
+            if (titleEl) titleEl.innerText = titleText;
+        }
+    }
+
+    const wrapper = container.append('div').attr('class', 'd3-svg-wrapper')
+        .style('display', 'flex').style('flex-direction', 'row').style('width', '100%').style('height', '100%');
+        
+    const chartContainer = wrapper.append('div').style('flex-grow', '1').style('min-width', '0').style('height', '100%').style('position', 'relative');
+    const legendContainer = wrapper.append('div').style('flex', '0 0 145px').style('display', 'flex').style('flex-direction', 'column')
+        .style('justify-content', 'center').style('gap', '8px').style('padding-left', '10px');
+
+    const svg = chartContainer.append('svg').style('position', 'absolute').style('top', 0).style('left', 0).style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
@@ -51,11 +69,11 @@ function renderLocationChart(canvasId, dataset) {
     };
 
     function draw() {
-        svg.selectAll('*').remove();
-        const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
+        const cw = chartContainer.node().clientWidth; const ch = chartContainer.node().clientHeight;
         if (cw === 0 || ch === 0) return;
+        svg.selectAll('*').remove();
 
-        const margin = { top: 20, right: 95, bottom: 45, left: 50 };
+        const margin = { top: 20, right: 20, bottom: 40, left: 50 };
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -63,13 +81,25 @@ function renderLocationChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.layer, .bar-item, .legend-item').style('opacity', 1);
+                g.selectAll('.layer, .bar-item').style('opacity', 1);
+                legendContainer.selectAll('.legend-item').style('opacity', 1);
             } else {
                 g.selectAll('.bar-item').style('opacity', d => (isSingleYear ? d.label : selectedLocations[0]) === activeSeries ? 1 : 0.1);
                 g.selectAll('.layer').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
-                g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
+                legendContainer.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
             }
         }
+
+        legendContainer.selectAll('.legend-item').data(selectedLocations).join('div').attr('class', 'legend-item')
+            .style('display', 'flex').style('align-items', 'center').style('gap', '6px').style('cursor', 'pointer').style('transition', 'opacity 0.2s')
+            .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d); })
+            .html(d => {
+                let text = d;
+                if (d === 'Major Cities of Australia') text = 'Major Cities<br>of Australia';
+                else if (d.includes(' Australia') && d !== 'Australia') text = d.replace(' Australia', '<br>Australia');
+                return `<svg width="12" height="12" style="flex-shrink: 0;"><rect width="12" height="12" rx="2" fill="${colorScale(d)}"></rect></svg>
+                        <span style="font-size: 11px; color: #333; font-family: sans-serif; line-height: 1.2; white-space: nowrap;">${text}</span>`;
+            });
 
         if (useBarChart) {
             const labels = isSingleYear ? selectedLocations : selectedYears;
@@ -94,18 +124,23 @@ function renderLocationChart(canvasId, dataset) {
             const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
             if (isSingleYear) {
                 xAxis.selectAll('.tick text').each(function(d) {
-                    const el = d3.select(this); const lines = formatLegendLabel(d);
+                    const el = d3.select(this); let lines = [d];
+                    if (d === 'Major Cities of Australia') lines = ['Major Cities', 'of Australia'];
+                    else if (d.includes(' Australia') && d !== 'Australia') lines = [d.replace(' Australia', ''), 'Australia'];
                     el.text(''); lines.forEach((line, i) => el.append('tspan').attr('x', 0).attr('dy', i === 0 ? '0.71em' : '1.2em').text(line));
                 });
             }
 
             g.append('g').call(d3.axisLeft(y).tickFormat(d => isSingleYear ? d + '%' : d.toLocaleString()));
 
-            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
+            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
+                .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
+                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
                     tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(isSingleYear ? d.label : activeVal));
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(isSingleYear ? d.label : activeVal); });
         } else {
             const stackData = selectedYears.map(year => {
                 const row = { year: year };
@@ -132,29 +167,16 @@ function renderLocationChart(canvasId, dataset) {
 
             const layers = g.selectAll('.layer').data(stack).enter().append('g').attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => colorScale(d.key));
 
-            layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect').style('cursor', 'pointer').attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
+            layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect')
+                .style('cursor', 'pointer').attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
-                    const pct = (d[1] - d[0]).toFixed(1);
-                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${d.data.year})<br>Share: ${pct}%<br>Offenses: ${d.data[`${d.key}_raw`].toLocaleString()}<br>• Fines: ${d.data[`${d.key}_f`].toLocaleString()}<br>• Arrests: ${d.data[`${d.key}_a`].toLocaleString()}<br>• Charges: ${d.data[`${d.key}_c`].toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.key));
-
-            const itemHeight = 32;
-            const legendHeight = selectedLocations.length * itemHeight;
-            const startY = Math.max(0, (height - legendHeight) / 2);      
-            const legend = g.append('g').attr('transform', `translate(${width + 15}, ${startY})`);
-
-            selectedLocations.forEach((loc, i) => {
-                const row = legend.append('g').datum(loc).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
-                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', colorScale(loc)).attr('y', -5).attr('rx', 2);
-                const lines = formatLegendLabel(loc);
-                lines.forEach((lineStr, lineIdx) => {
-                    row.append('text').attr('x', 15).attr('y', 4 + (lineIdx * 12)).text(lineStr).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
-                });
-            });
+                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${d.data.year})<br>Share: ${(d[1] - d[0]).toFixed(1)}%<br>Offenses: ${d.data[`${d.key}_raw`].toLocaleString()}<br>• Fines: ${d.data[`${d.key}_f`].toLocaleString()}<br>• Arrests: ${d.data[`${d.key}_a`].toLocaleString()}<br>• Charges: ${d.data[`${d.key}_c`].toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
         }
         applyHighlight();
     }
     const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
-    ro.observe(wrapper.node()); container.node()._d3Observer = ro;
+    ro.observe(chartContainer.node()); container.node()._d3Observer = ro;
 }
