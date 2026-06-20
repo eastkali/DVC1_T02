@@ -92,7 +92,26 @@ window.injectDataTableModal = function() {
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
 
-document.addEventListener('DOMContentLoaded', window.injectDataTableModal);
+window.injectChartModal = function() {
+    if (document.getElementById('chart-modal')) return;
+    const modalHtml = `
+        <div id="chart-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30, 41, 59, 0.7); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(2px);">
+            <div style="background: white; width: 85%; max-width: 1200px; height: 85%; max-height: 800px; display: flex; flex-direction: column; border-radius: 8px; box-shadow: 0 10px 25px rgba(0,0,0,0.2); overflow: hidden; padding: 25px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px solid #e2e8f0; padding-bottom: 15px;">
+                    <h2 id="modal-title" style="margin: 0; font-size: 22px; color: #1e293b; font-weight: 700;">Chart View</h2>
+                    <button onclick="document.getElementById('chart-modal').style.display='none'" style="background: none; border: none; font-size: 32px; cursor: pointer; color: #94a3b8; line-height: 1; padding: 0; margin-top: -5px;">&times;</button>
+                </div>
+                <div id="modal-chart-container" style="flex-grow: 1; position: relative; width: 100%; height: 100%;"></div>
+            </div>
+        </div>
+    `;
+    document.body.insertAdjacentHTML('beforeend', modalHtml);
+};
+
+document.addEventListener('DOMContentLoaded', () => {
+    window.injectDataTableModal();
+    window.injectChartModal();
+});
 
 window.openDataTableModal = function(chartId) {
     const config = window.chartConfigs.find(c => c.id === chartId);
@@ -138,12 +157,18 @@ window.openDataTableModal = function(chartId) {
 };
 
 window.openModal = function(chartId) {
-    document.getElementById('chart-modal').style.display = 'flex';
+    const modal = document.getElementById('chart-modal');
+    if (!modal) return;
+    
+    modal.style.display = 'flex';
+    
     const config = window.chartConfigs.find(c => c.id === chartId);
     document.getElementById('modal-title').innerText = config ? config.title : 'Chart View';
-    document.getElementById('modal-chart-container').innerHTML = `<canvas id="modal-canvas"></canvas>`;
     
-    if (!window.rawDatasets.main) return;
+    const container = document.getElementById('modal-chart-container');
+    container.innerHTML = `<canvas id="modal-canvas" style="display:none;"></canvas>`;
+    
+    if (!window.rawDatasets || !window.rawDatasets.main) return;
 
     const filters = window.getActiveFilters();
     const yearsWithLocAge = [...new Set(window.rawDatasets.loc_age.map(d => d.YEAR))].sort((a,b)=>b-a);
@@ -151,22 +176,24 @@ window.openModal = function(chartId) {
 
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
+    const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
     
     let fLocation, fAge;
     if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     } else {
-        fLocation = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
-        fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
+        fLocation = window.getFilteredData(window.rawDatasets.loc_age, {year: ["0"]});
+        fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: ["0"]});
     }
-    const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
 
-    if (chartId === 'method' && typeof renderDetectionChart === 'function') renderDetectionChart('modal-canvas', fDetection);
-    if (chartId === 'jurisdiction' && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('modal-canvas', fJurisdiction);
-    if (chartId === 'location' && typeof renderLocationChart === 'function') renderLocationChart('modal-canvas', fLocation);
-    if (chartId === 'age' && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('modal-canvas', fAge);
-    if (chartId === 'normalized' && typeof renderNormalizedChart === 'function') renderNormalizedChart('modal-canvas', fLicense);
+    setTimeout(() => {
+        if (chartId === 'method' && typeof renderDetectionChart === 'function') renderDetectionChart('modal-canvas', fDetection);
+        if (chartId === 'jurisdiction' && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('modal-canvas', fJurisdiction);
+        if (chartId === 'location' && typeof renderLocationChart === 'function') renderLocationChart('modal-canvas', fLocation);
+        if (chartId === 'age' && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('modal-canvas', fAge);
+        if (chartId === 'normalized' && typeof renderNormalizedChart === 'function') renderNormalizedChart('modal-canvas', fLicense);
+    }, 50);
 };
 
 window.fillSelect = function(elementId, items) {
