@@ -51,7 +51,6 @@ window.buildDashboardGrid = function() {
         </div>
     `;
 
-    // THE FIX: Bottom Row gets 3 equal columns (1fr 1fr 1fr)
     let bottomRowHtml = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%;">`;
     const bottomCharts = ['jurisdiction', 'age', 'normalized'];
     

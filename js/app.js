@@ -1,4 +1,4 @@
-window.currentTopic = 'mp'; 
+window.currentTopic = ''; 
 window.rawDatasets = {};
 
 window.okabeItoColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
@@ -126,8 +126,8 @@ window.getActiveFilters = function() {
         const values = Array.from(checkedItems).map(cb => cb.value);
         return values.length === 0 ? ['all'] : values;
     }
-
     return {
+        
         year: getSelectedValues('filter-year'),
         jurisdiction: getSelectedValues('filter-jurisdiction'),
         location: getSelectedValues('filter-location'),
@@ -264,16 +264,20 @@ window.onload = function() {
     if(typeof window.injectDataTableModal === 'function') window.injectDataTableModal(); 
 
     const topicMenu = document.getElementById('topic-menu');
+    
     if (topicMenu) {
+        
         topicMenu.addEventListener('click', (e) => {
             if (!e.target.classList.contains('nav-btn')) return;
             document.querySelectorAll('#topic-menu .nav-btn').forEach(b => b.classList.remove('active'));
             e.target.classList.add('active');
             
             const topic = e.target.getAttribute('data-topic');
+
             if (topic === 'home') {
                 const homeView = document.getElementById('home-view');
                 const dashView = document.getElementById('dashboard-view');
+
                 if (homeView) homeView.style.display = 'flex';
                 if (dashView) dashView.style.display = 'none';
             } else {
@@ -296,45 +300,24 @@ window.onload = function() {
             }
         });
     }
-
-    const radioBtns = document.querySelectorAll('input[name="dataset"]');
-    radioBtns.forEach(radio => {
-        radio.addEventListener('change', (e) => {
-            if (e.target.checked) {
-                window.currentTopic = e.target.value;
-                window.loadTopicData(window.currentTopic);
-            }
+    const filtersContainer = document.querySelector('.filters-container');
+    filtersContainer.addEventListener('change', (event) => {
+        window.renderDashboardCharts();
+    });
+    
+    document.getElementById('reset-view-btn').addEventListener('click', () => {
+        document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
+            const allCb = dropdown.querySelector('.filter-checkbox-all');
+            const items = dropdown.querySelectorAll('.filter-checkbox-item');
+            const text = dropdown.querySelector('.dropdown-text');
+            if (allCb) allCb.checked = true;
+            items.forEach(i => i.checked = false);
+            if (text) text.innerText = 'All';
         });
+        window.renderDashboardCharts();
     });
 
-    const resetBtn = document.getElementById('reset-view-btn');
-    if (resetBtn) {
-        resetBtn.addEventListener('click', () => {
-            document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
-                const allCb = dropdown.querySelector('.filter-checkbox-all');
-                const items = dropdown.querySelectorAll('.filter-checkbox-item');
-                const text = dropdown.querySelector('.dropdown-text');
-                if (allCb) allCb.checked = true;
-                items.forEach(i => i.checked = false);
-                if (text) text.innerText = 'All';
-            });
-            window.renderDashboardCharts();
-        });
-    }
-
-    const closeModalBtn = document.getElementById('close-modal-btn');
-    if (closeModalBtn) {
-        closeModalBtn.addEventListener('click', () => {
-            const chartModal = document.getElementById('chart-modal');
-            if (chartModal) chartModal.style.display = 'none';
-        });
-    }
-
-    if (!topicMenu && radioBtns.length > 0) {
-        const checkedRadio = document.querySelector('input[name="dataset"]:checked');
-        if (checkedRadio) {
-            window.currentTopic = checkedRadio.value;
-            window.loadTopicData(window.currentTopic);
-        }
-    }
+    // document.getElementById('close-modal-btn').addEventListener('click', () => {
+    //     document.getElementById('chart-modal').style.display = 'none';
+    // });
 };

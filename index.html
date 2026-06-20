@@ -11,29 +11,95 @@
 
     <header class="dashboard-header">
         <div class="header-inner">
-            <h1>Road Safety Offences Dashboard</h1>
-            <div class="dataset-toggle" style="margin-top: 10px;">
-                <span style="color: white; font-size: 14px;">
-                    <input type="radio" name="dataset" value="mp" id="radio-mp" checked> Mobile Phone
-                </span>
-                <span style="color: white; font-size: 14px; margin-left: 15px;">
-                    <input type="radio" name="dataset" value="s" id="radio-s"> Seatbelt
-                </span>
-            </div>
+            <h1>Police Enforcement Dashboard</h1>
+            <nav class="main-menu" id="topic-menu">
+                <button class="nav-btn active" data-topic="home" aria-pressed="true">Home</button>
+                <button class="nav-btn" data-topic="s" aria-pressed="false">Seatbelts</button>
+                <button class="nav-btn" data-topic="mp" aria-pressed="false">Mobile Phone</button>
+            </nav>
         </div>
     </header>
 
-    <main class="main-content">
-        <section class="filters-section">
-            <div class="filter-group"><label>Jurisdiction</label><select id="filter-jurisdiction"></select></div>
-            <div class="filter-group"><label>Location</label><select id="filter-location"></select></div>
-            <div class="filter-group"><label>Years</label><select id="filter-year"></select></div>
-            <div class="filter-group"><label>Age Group</label><select id="filter-age"></select></div>
-            <div class="filter-group"><label>Method</label><select id="filter-method"></select></div>
-            <button id="reset-view-btn" class="reset-btn">Reset View</button>
+    <div class="main-content">
+        
+        <section id="home-view" class="view-section">
+            <div style="max-width: 850px; margin: 15px auto; background-color: #ffffff; padding: 25px 40px 40px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155;">
+                
+                <h1 style="color: #0f172a; font-size: 24px; margin-top: 0; margin-bottom: 16px;">Australian Road Safety Enforcement Dashboard</h1>
+                <p style="font-size: 15px; line-height: 1.6; margin-bottom: 30px;">
+                    This dashboard visualizes traffic enforcement data across Australia. It tracks traffic offenses, detection methods, demographics, and trends over time. Click a topic in the menu above (such as <strong>Seatbelts</strong> or <strong>Mobile Phone</strong>) to filter and view the interactive charts.
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 30px 0;">
+
+                <h2 style="color: #0f172a; font-size: 18px; margin-bottom: 24px;">Data Sources & Methodology</h2>
+
+                <div style="margin-bottom: 24px;">
+                    <h3 style="color: #1e293b; font-size: 15px; margin-bottom: 8px;">1. Main Dataset: Road Safety Enforcement Data</h3>
+                    <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 10px;">
+                        This is the core dataset used for all the charts on this dashboard. It contains records of official traffic fines, arrests, and legal charges across different states and territories.
+                    </p>
+                    <ul style="font-size: 14px; line-height: 1.6; margin-top: 0; padding-left: 20px; color: #475569;">
+                        <li><strong>Source:</strong> Bureau of Infrastructure and Transport Research Economics (BITRE) / DITRDCSA</li>
+                        <li><strong>Portals:</strong> <a href="https://datahub.roadsafety.gov.au/safe-systems/safe-road-use/police-enforcement" target="_blank" style="color: #2563eb; text-decoration: none;">Australia Road Safety Data Hub</a> | <a href="https://catalogue.data.infrastructure.gov.au/dataset/road-safety-enforcement-data" target="_blank" style="color: #2563eb; text-decoration: none;">Infrastructure Data Catalogue</a></li>
+                        <li><strong>Direct Files:</strong> <a href="https://datahub.roadsafety.gov.au/sites/default/files/documents/police_enforcement_2024_fines.xlsx" target="_blank" style="color: #2563eb; text-decoration: none;">Excel Sheet</a> | <a href="https://aueprod01ckanstg.blob.core.windows.net/public-catalogue/1acc0247-1090-4229-842e-1c5709b8328c/police_enforcement_2024_fines%20(12).csv" target="_blank" style="color: #2563eb; text-decoration: none;">CSV File</a></li>
+                    </ul>
+                </div>
+
+                <div style="margin-bottom: 24px;">
+                    <h3 style="color: #1e293b; font-size: 15px; margin-bottom: 8px;">2. Normalization Data: Driver Licence Holders</h3>
+                    <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 10px;">
+                        Because highly populated states naturally have more total offenses, we use this second dataset to calculate a fair comparative metric: <em>offenses per 10,000 licence holders</em>. This prevents raw population numbers from skewing the data.
+                    </p>
+                    <ul style="font-size: 14px; line-height: 1.6; margin-top: 0; padding-left: 20px; color: #475569;">
+                        <li><strong>Source:</strong> BITRE Australian Infrastructure and Transport Statistics Yearbook</li>
+                        <li><strong>Links:</strong> <a href="https://www.bitre.gov.au/publications/2025/australian-infrastructure-and-transport-statistics-yearbook-2024" target="_blank" style="color: #2563eb; text-decoration: none;">Yearbook Publication Page</a> | <a href="https://www.bitre.gov.au/sites/default/files/documents/australian-infrastructure-and-transport-statistics--yearbook-2024--january-2025.pdf" target="_blank" style="color: #2563eb; text-decoration: none;">Direct PDF Document</a></li>
+                    </ul>
+                </div>
+
+                <div>
+                    <h3 style="color: #1e293b; font-size: 15px; margin-bottom: 8px;">3. Definitions: Data Dictionary</h3>
+                    <p style="font-size: 14px; line-height: 1.5; margin-top: 0; margin-bottom: 10px;">
+                        This reference document is used to verify metadata schemas and ensure fields like "Fines" and "Charges" match standardized classifications.
+                    </p>
+                    <ul style="font-size: 14px; line-height: 1.6; margin-top: 0; padding-left: 20px; color: #475569;">
+                        <li><strong>Link:</strong> <a href="https://datahub.roadsafety.gov.au/sites/default/files/documents/Road%20safety%20enforcement%20data%20dictionary%202024.pdf" target="_blank" style="color: #2563eb; text-decoration: none;">Road Safety Enforcement Data Dictionary PDF</a></li>
+                    </ul>
+                </div>
+
+            </div>
         </section>
 
-        <div class="dashboard-grid">
+        <div id="dashboard-view" class="view-section" style="display: none;">
+            
+            <div style="max-width: 1200px; margin: 0 auto 15px auto; background-color: #ffffff; padding: 15px 20px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; color: #334155; font-size: 14px; line-height: 1.5; ">
+                <div>
+                    <strong>How to use:</strong> Adjust the dropdown choices below to narrow down data by location, year, age, or enforcement method. You can hover over specific sections of the charts to reveal detailed breakdowns.You can also click on specific lines or colored regions, or click on the symbol or color on the legend to highlight that line or region to view in more clearly. 
+                </div>
+                <div>
+                    <strong>Data Note:</strong> 
+                    <br>
+                    (1) For chart titled "Jurisdiction (Normalized by License Holders)"", rate-based charts utilize normalization data calculated per 10,000 licence holders to enable an accurate baseline comparison between states. Calculation is done by taking total offenses divided by number of license holders then multiplied by 10,000, the result is then rounded to the nearest integer value. However, it can only be filtered by years and jurisdiction, so filtering by any other criteria will not display any data for the chart. 
+                    <br> 
+                    (2) Location and age group data is only collected after year 2023, so filtering by years before 2023 will not display any data for the two charts.
+                </div>
+            </div>
+
+            <section class="filters-container filters-section">
+                <div class="filter-group"><label>Jurisdiction</label><select id="filter-jurisdiction" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Location</label><select id="filter-location" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Years</label><select id="filter-year" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Age Group</label><select id="filter-age" class="chart-filter"></select></div>
+                <div class="filter-group"><label>Method</label><select id="filter-method" class="chart-filter"></select></div>
+                <button id="reset-view-btn" class="reset-btn">Reset View</button>
+            </section>
+
+            <main class="dashboard-grid" id="dashboard-grid"></main>
+        </div>
+
+    </div>    
+
+        <!-- <div class="dashboard-grid">
             <div class="chart-card">
                 <div class="chart-header" style="justify-content: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px;">
                     <h3 style="text-align: center;">Summary for data from available filters</h3>
@@ -96,7 +162,7 @@
                 <div class="canvas-container"><canvas id="chart-normalized"></canvas></div>
             </div>
         </div>
-    </main>
+
 
     <div id="chart-modal" class="modal">
         <div class="modal-content">
@@ -106,7 +172,7 @@
                 <canvas id="modal-canvas"></canvas>
             </div>
         </div>
-    </div>
+    </div> -->
 
     <script src="js/dashboardUI.js" defer></script>
     <script src="js/kpiSummary.js" defer></script>
