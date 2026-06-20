@@ -36,7 +36,7 @@ function renderLocationChart(canvasId, dataset) {
     const useBarChart = isSingleYear || isSingleLocation;
 
     const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
-    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%');
+    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
@@ -65,7 +65,7 @@ function renderLocationChart(canvasId, dataset) {
             if (!activeSeries) {
                 g.selectAll('.layer, .bar-item, .legend-item').style('opacity', 1);
             } else {
-                g.selectAll('.bar-item').style('opacity', d => d.label === activeSeries ? 1 : 0.1);
+                g.selectAll('.bar-item').style('opacity', d => (isSingleYear ? d.label : selectedLocations[0]) === activeSeries ? 1 : 0.1);
                 g.selectAll('.layer').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
             }
@@ -88,6 +88,9 @@ function renderLocationChart(canvasId, dataset) {
             const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
 
+            g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
+            g.selectAll('.grid-lines path').style('display', 'none');
+
             const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
             if (isSingleYear) {
                 xAxis.selectAll('.tick text').each(function(d) {
@@ -98,7 +101,7 @@ function renderLocationChart(canvasId, dataset) {
 
             g.append('g').call(d3.axisLeft(y).tickFormat(d => isSingleYear ? d + '%' : d.toLocaleString()));
 
-            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
+            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
                     tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
@@ -121,6 +124,9 @@ function renderLocationChart(canvasId, dataset) {
             const x = d3.scaleBand().domain(selectedYears).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
 
+            g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(5)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
+            g.selectAll('.grid-lines path').style('display', 'none');
+
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
             g.append('g').call(d3.axisLeft(y).tickFormat(d => d + '%'));
 
@@ -135,8 +141,8 @@ function renderLocationChart(canvasId, dataset) {
 
             const itemHeight = 32;
             const legendHeight = selectedLocations.length * itemHeight;
-            const startY = Math.max(0, (height - legendHeight) / 2);
-            const legend = g.append('g').attr('transform', `translate(${width + 10}, ${startY})`);
+            const startY = Math.max(0, (height - legendHeight) / 2);      
+            const legend = g.append('g').attr('transform', `translate(${width + 15}, ${startY})`);
 
             selectedLocations.forEach((loc, i) => {
                 const row = legend.append('g').datum(loc).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
