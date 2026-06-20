@@ -238,3 +238,44 @@ body {
 .canvas-container {
     flex-grow: 1; position: relative; width: 100%;
 }
+
+/* Dashboard Grid Layouts */
+.top-row-grid {
+    display: grid; 
+    grid-template-columns: 200px 1fr 1fr; 
+    gap: 20px; 
+    width: 100%; 
+    margin-bottom: 20px;
+}
+.bottom-row-grid {
+    display: grid; 
+    grid-template-columns: repeat(3, 1fr); 
+    gap: 20px; 
+    width: 100%;
+}
+
+/* Tablet and Smaller Desktop Layout */
+@media (max-width: 1200px) {
+    .top-row-grid {
+        grid-template-columns: 200px 1fr;
+    }
+    .top-row-grid > div:nth-child(3) {
+        grid-column: 1 / -1;
+    }
+    
+    .bottom-row-grid {
+        grid-template-columns: 1fr 1fr;
+    }
+    .bottom-row-grid > div:nth-child(1) {
+        grid-column: 1 / -1;
+    }
+}
+
+/* Mobile Layout */
+@media (max-width: 800px) {
+    .top-row-grid { grid-template-columns: 1fr; }
+    .top-row-grid > div:nth-child(3) { grid-column: auto; }
+    
+    .bottom-row-grid { grid-template-columns: 1fr; }
+    .bottom-row-grid > div:nth-child(1) { grid-column: auto; }
+}
