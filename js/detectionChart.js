@@ -27,7 +27,7 @@ function renderDetectionChart(canvasId, dataset) {
     const colorScale = d3.scaleOrdinal().domain(allMethods).range(targetColors);
 
     const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
-    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%');
+    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
@@ -35,11 +35,11 @@ function renderDetectionChart(canvasId, dataset) {
     let activeSeries = null;
 
     function draw() {
-        svg.selectAll('*').remove();
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
+        svg.selectAll('*').remove();
 
-        const margin = { top: 20, right: 85, bottom: 45, left: 60 };
+        const margin = { top: 20, right: 80, bottom: 45, left: 60 };
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -47,10 +47,10 @@ function renderDetectionChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.area-path, .bar-item, .legend-item').style('opacity', 1);
+                g.selectAll('.area-path, .bar-item, .data-dot, .legend-item').style('opacity', 1);
             } else {
                 g.selectAll('.bar-item').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
-                g.selectAll('.area-path').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
+                g.selectAll('.area-path, .data-dot').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
             }
         }
@@ -68,10 +68,13 @@ function renderDetectionChart(canvasId, dataset) {
             const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
 
+            g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
+            g.selectAll('.grid-lines path').style('display', 'none');
+
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
+            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
                     tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
@@ -88,20 +91,32 @@ function renderDetectionChart(canvasId, dataset) {
             const y = d3.scaleLinear().domain([0, d3.max(stack[stack.length-1] || [{1:0}], d => d[1]) * 1.1]).nice().range([height, 0]);
             const area = d3.area().x(d => x(d.data.year)).y0(d => y(d[0])).y1(d => y(d[1]));
 
+            g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
+            g.selectAll('.grid-lines path').style('display', 'none');
+
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('path.area-path').data(stack).enter().append('path').attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('d', area).attr('fill', d => colorScale(d.key))
+            const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
+
+            areas.append('path')
+                .attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
+                .attr('d', area).attr('fill', d => colorScale(d.key)).style('stroke', d => colorScale(d.key)).style('stroke-width', 1.5).style('stroke-linejoin', 'round')
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
                     const pointer = d3.pointer(event, this); const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); const pt = d.find(p => p.data.year === closestYear);
                     tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${closestYear})<br>Offenses: ${(pt[1] - pt[0]).toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.key));
 
+            areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
+                .attr('class', 'data-dot').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3)
+                .attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
+
             const itemHeight = 22;
             const legendHeight = selectedMethods.length * itemHeight;
-            const startY = Math.max(0, (height - legendHeight) / 2);
-            const legend = g.append('g').attr('transform', `translate(${width + 10}, ${startY})`);
+            const startY = Math.max(0, (height - legendHeight) / 2);    
+            const legend = g.append('g').attr('transform', `translate(${width + 15}, ${startY})`);
 
             selectedMethods.forEach((method, i) => {
                 const row = legend.append('g').datum(method).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
