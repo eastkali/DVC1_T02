@@ -1,4 +1,4 @@
-window.currentTopic = ''; 
+window.currentTopic = 'mp'; 
 window.rawDatasets = {};
 
 window.okabeItoColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
@@ -85,7 +85,7 @@ window.toggleDatasetHighlight = function(chart, datasetIndex) {
             dataset.pointBorderColor = 'rgba(200, 200, 200, 1)';
         }
     });
-    chart.update();
+    if (typeof chart.update === 'function') chart.update();
 };
 
 window.enforceInteractiveHighlight = function() {
@@ -124,7 +124,6 @@ window.getActiveFilters = function() {
         }
         
         const values = Array.from(checkedItems).map(cb => cb.value);
-        
         return values.length === 0 ? ['all'] : values;
     }
 
@@ -138,9 +137,7 @@ window.getActiveFilters = function() {
 };
 
 window.getFilteredData = function(dataArray, filters) {
-    
     if (!dataArray || !Array.isArray(dataArray)) return dataArray;
-    
     
     return dataArray.filter(row => {
         const keys = Object.keys(row);
@@ -183,10 +180,7 @@ window.loadTopicData = function(topic) {
         d3.csv(`data/${prefix}_main.csv`),
         d3.csv(`data/${prefix}_loc_age.csv`)  
     ]).then(([license, main, loc_age]) => {
-        
         window.rawDatasets = { license, main, loc_age };
-        const years = [...new Set(main.map(d => d.YEAR))].sort((a,b)=>b-a);
-        console.log(window.rawDatasets.license)
 
         if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
         window.renderDashboardCharts();
@@ -224,6 +218,10 @@ window.renderDashboardCharts = function() {
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
+    
+    let fLocation = [];
+    let fAge = [];
+    
     if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
@@ -231,7 +229,6 @@ window.renderDashboardCharts = function() {
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
         fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
     }
-
 
     if (window.checkDataAndToggle('chart-method', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('chart-method', fDetection);
     if (window.checkDataAndToggle('chart-jurisdiction', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('chart-jurisdiction', fJurisdiction);
@@ -242,11 +239,12 @@ window.renderDashboardCharts = function() {
     const kpiContainer = document.getElementById('offenseLevelKpiContainer');
     if (kpiContainer) {
         
+        let activeKpiData = []; // <--- THIS FIXES THE CRASH
+
         if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
-        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;else if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
+        else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
+        else if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
         else if (fAge && fAge.length > 0) activeKpiData = fAge;
-      
-       
 
         if (activeKpiData.length === 0) {
             kpiContainer.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100%; color:#64748b; font-weight:bold; font-size:14px; text-align:center; padding: 20px;">No data available for the selected filters.</div>';
@@ -265,19 +263,53 @@ window.onload = function() {
     if(typeof window.buildDashboardGrid === 'function') window.buildDashboardGrid(); 
     if(typeof window.injectDataTableModal === 'function') window.injectDataTableModal(); 
 
-    document.getElementById('topic-menu').addEventListener('click', (e) => {
-        if (!e.target.classList.contains('nav-btn')) return;
-        document.querySelectorAll('#topic-menu .nav-btn').forEach(b => b.classList.remove('active'));
-        e.target.classList.add('active');
-        
-        const topic = e.target.getAttribute('data-topic');
-        if (topic === 'home') {
-            document.getElementById('home-view').style.display = 'flex';
-            document.getElementById('dashboard-view').style.display = 'none';
-        } else {
-            document.getElementById('home-view').style.display = 'none';
-            document.getElementById('dashboard-view').style.display = 'block';
+    const topicMenu = document.getElementById('topic-menu');
+    if (topicMenu) {
+        topicMenu.addEventListener('click', (e) => {
+            if (!e.target.classList.contains('nav-btn')) return;
+            document.querySelectorAll('#topic-menu .nav-btn').forEach(b => b.classList.remove('active'));
+            e.target.classList.add('active');
             
+            const topic = e.target.getAttribute('data-topic');
+            if (topic === 'home') {
+                const homeView = document.getElementById('home-view');
+                const dashView = document.getElementById('dashboard-view');
+                if (homeView) homeView.style.display = 'flex';
+                if (dashView) dashView.style.display = 'none';
+            } else {
+                const homeView = document.getElementById('home-view');
+                const dashView = document.getElementById('dashboard-view');
+                if (homeView) homeView.style.display = 'none';
+                if (dashView) dashView.style.display = 'block';
+                
+                document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
+                    const allCb = dropdown.querySelector('.filter-checkbox-all');
+                    const items = dropdown.querySelectorAll('.filter-checkbox-item');
+                    const text = dropdown.querySelector('.dropdown-text');
+                    if (allCb) allCb.checked = true;
+                    items.forEach(i => i.checked = false);
+                    if (text) text.innerText = 'All';
+                });
+
+                window.currentTopic = topic;
+                window.loadTopicData(window.currentTopic);
+            }
+        });
+    }
+
+    const radioBtns = document.querySelectorAll('input[name="dataset"]');
+    radioBtns.forEach(radio => {
+        radio.addEventListener('change', (e) => {
+            if (e.target.checked) {
+                window.currentTopic = e.target.value;
+                window.loadTopicData(window.currentTopic);
+            }
+        });
+    });
+
+    const resetBtn = document.getElementById('reset-view-btn');
+    if (resetBtn) {
+        resetBtn.addEventListener('click', () => {
             document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
                 const allCb = dropdown.querySelector('.filter-checkbox-all');
                 const items = dropdown.querySelectorAll('.filter-checkbox-item');
@@ -286,25 +318,23 @@ window.onload = function() {
                 items.forEach(i => i.checked = false);
                 if (text) text.innerText = 'All';
             });
+            window.renderDashboardCharts();
+        });
+    }
 
-            window.currentTopic = topic;
+    const closeModalBtn = document.getElementById('close-modal-btn');
+    if (closeModalBtn) {
+        closeModalBtn.addEventListener('click', () => {
+            const chartModal = document.getElementById('chart-modal');
+            if (chartModal) chartModal.style.display = 'none';
+        });
+    }
+
+    if (!topicMenu && radioBtns.length > 0) {
+        const checkedRadio = document.querySelector('input[name="dataset"]:checked');
+        if (checkedRadio) {
+            window.currentTopic = checkedRadio.value;
             window.loadTopicData(window.currentTopic);
         }
-    });
-
-    document.getElementById('reset-view-btn').addEventListener('click', () => {
-        document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
-            const allCb = dropdown.querySelector('.filter-checkbox-all');
-            const items = dropdown.querySelectorAll('.filter-checkbox-item');
-            const text = dropdown.querySelector('.dropdown-text');
-            if (allCb) allCb.checked = true;
-            items.forEach(i => i.checked = false);
-            if (text) text.innerText = 'All';
-        });
-        window.renderDashboardCharts();
-    });
-
-    document.getElementById('close-modal-btn').addEventListener('click', () => {
-        document.getElementById('chart-modal').style.display = 'none';
-    });
+    }
 };

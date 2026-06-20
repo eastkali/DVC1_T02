@@ -11,61 +11,59 @@ window.buildDashboardGrid = function() {
     if(!grid) return;
     
     grid.style.display = 'block'; 
+    grid.style.gridTemplateColumns = 'none';
     grid.innerHTML = ''; 
 
     const topRowHtml = `
-        <div style="display: flex; flex-wrap: wrap; gap: 20px; width: 100%; margin-bottom: 20px;">
-            <div class="chart-card" style="flex: 0 0 170px; min-width: 155px; display: flex; flex-direction: column; margin: 0; padding: 8px; box-sizing: border-box;">
-                <style>
-                    #offenseLevelKpiContainer { display: flex !important; flex-direction: column !important; gap: 12px !important; justify-content: center !important; align-items: center !important; width: 100% !important; box-sizing: border-box !important; }
-                    #offenseLevelKpiContainer > div { width: 100% !important; padding: 8px 4px !important; box-sizing: border-box !important; text-align: center !important; }
-                    #offenseLevelKpiContainer h1, #offenseLevelKpiContainer h2, #offenseLevelKpiContainer .value, #offenseLevelKpiContainer p, #offenseLevelKpiContainer strong, #offenseLevelKpiContainer div[style*="font-size"], #offenseLevelKpiContainer span[style*="font-size"] { font-size: 16px !important; font-weight: 700 !important; line-height: 1.2 !important; text-align: center !important; margin: 0 auto 3px auto !important; white-space: normal !important; display: block !important; }
-                    #offenseLevelKpiContainer h3, #offenseLevelKpiContainer h4, #offenseLevelKpiContainer h5, #offenseLevelKpiContainer h6, #offenseLevelKpiContainer .label, #offenseLevelKpiContainer .kpi-label, #offenseLevelKpiContainer span:not([style*="font-size"]) { font-size: 11px !important; text-transform: uppercase !important; letter-spacing: 0.3px !important; line-height: 1.2 !important; text-align: center !important; margin: 0 auto !important; font-weight: 600 !important; display: block !important; opacity: 0.85; white-space: normal !important;}
-                </style>
-                <div class="chart-header" style="padding: 4px 0 8px 0; border-bottom: 1px solid #eee; justify-content: center;">
-                    <h3 style="font-size: 13px; margin: 0; text-align: center; font-weight: 600;">Summary for data from available filters</h3>
+        <div style="display: grid; grid-template-columns: 200px 1fr 1fr; gap: 20px; width: 100%; margin-bottom: 20px;">
+            <div class="chart-card" style="margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                <div class="chart-header" style="padding: 15px; margin: 0; border-bottom: 1px solid #e2e8f0; display: flex; justify-content: center; align-items: center; background: #fff;">
+                    <h3 style="margin: 0; font-size: 13px; color: #1e293b; text-align: center;">Summary for data from available filters</h3>
                 </div>
-                <div class="canvas-container" id="offenseLevelKpiContainer" style="flex-grow: 1; padding: 8px 0 0 0; display: flex; flex-direction: column; justify-content: center; overflow: hidden; box-sizing: border-box; position: relative;"></div>
+                <div class="canvas-container" id="offenseLevelKpiContainer" style="flex-grow: 1; display: flex; flex-direction: column; justify-content: center; background: #fff;"></div>
             </div>
-            <div class="chart-card" style="flex: 1 1 0%; min-width: 280px; display: flex; flex-direction: column; margin: 0;">
-                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">Annual Offenses by Location (%)</h3>
+            
+            <div class="chart-card" style="margin: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 10px;">
+                    <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Annual Offenses by Location (%)</h3>
                     <div style="display: flex; gap: 4px;">
-                        <button class="enlarge-btn" title="View Data" onclick="window.openDataTableModal('location')">&#x25A6;</button>
-                        <button class="enlarge-btn" title="Enlarge Chart" onclick="window.openModal('location')">&#x2922;</button>
+                        <button class="enlarge-btn" title="View Data" onclick="window.openDataTableModal('location')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size: 16px;">&#x25A6;</button>
+                        <button class="enlarge-btn" title="Enlarge Chart" onclick="window.openModal('location')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size: 16px;">&#x2922;</button>
                     </div>
                 </div>
-                <div class="canvas-container" style="position: relative; flex-grow: 1; min-height: 250px;">
+                <div class="canvas-container" style="position: relative; flex-grow: 1; min-height: 300px;">
                     <canvas id="chart-location"></canvas>
                 </div>
             </div>
-            <div class="chart-card" style="flex: 1 1 0%; min-width: 280px; display: flex; flex-direction: column; margin: 0;">
-                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">Annual Offenses by Detection Method</h3>
+
+            <div class="chart-card" style="margin: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 10px;">
+                    <h3 style="margin: 0; font-size: 14px; color: #1e293b;">Annual Offenses by Detection Method</h3>
                     <div style="display: flex; gap: 4px;">
-                        <button class="enlarge-btn" title="View Data" onclick="window.openDataTableModal('method')">&#x25A6;</button>
-                        <button class="enlarge-btn" title="Enlarge Chart" onclick="window.openModal('method')">&#x2922;</button>
+                        <button class="enlarge-btn" title="View Data" onclick="window.openDataTableModal('method')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size: 16px;">&#x25A6;</button>
+                        <button class="enlarge-btn" title="Enlarge Chart" onclick="window.openModal('method')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size: 16px;">&#x2922;</button>
                     </div>
                 </div>
-                <div class="canvas-container" style="position: relative; flex-grow: 1; min-height: 250px;">
+                <div class="canvas-container" style="position: relative; flex-grow: 1; min-height: 300px;">
                     <canvas id="chart-method"></canvas>
                 </div>
             </div>
         </div>
     `;
 
+    // THE FIX: Bottom Row gets 3 equal columns (1fr 1fr 1fr)
     let bottomRowHtml = `<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; width: 100%;">`;
     const bottomCharts = ['jurisdiction', 'age', 'normalized'];
     
     bottomCharts.forEach(id => {
         const conf = window.chartConfigs.find(c => c.id === id);
         bottomRowHtml += `
-            <div class="chart-card" style="margin: 0; display: flex; flex-direction: column; min-width: 0;">
-                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 style="margin: 0;">${conf.title}</h3>
+            <div class="chart-card" style="margin: 0; display: flex; flex-direction: column; background: #fff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 15px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
+                <div class="chart-header" style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #e2e8f0; padding-bottom: 10px; margin-bottom: 10px;">
+                    <h3 style="margin: 0; font-size: 14px; color: #1e293b;">${conf.title}</h3>
                     <div style="display: flex; gap: 4px;">
-                        <button class="enlarge-btn" title="View Data" onclick="window.openDataTableModal('${conf.id}')">&#x25A6;</button>
-                        <button class="enlarge-btn" title="Enlarge Chart" onclick="window.openModal('${conf.id}')">&#x2922;</button>
+                        <button class="enlarge-btn" title="View Data" onclick="window.openDataTableModal('${conf.id}')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size: 16px;">&#x25A6;</button>
+                        <button class="enlarge-btn" title="Enlarge Chart" onclick="window.openModal('${conf.id}')" style="background:none; border:none; cursor:pointer; color:#94a3b8; font-size: 16px;">&#x2922;</button>
                     </div>
                 </div>
                 <div class="canvas-container" style="position: relative; flex-grow: 1; min-height: 300px;">
@@ -75,6 +73,7 @@ window.buildDashboardGrid = function() {
         `;
     });
     bottomRowHtml += `</div>`;
+    
     grid.innerHTML = topRowHtml + bottomRowHtml;
 };
 
@@ -93,6 +92,8 @@ window.injectDataTableModal = function() {
     `;
     document.body.insertAdjacentHTML('beforeend', modalHtml);
 };
+
+document.addEventListener('DOMContentLoaded', window.injectDataTableModal);
 
 window.openDataTableModal = function(chartId) {
     const config = window.chartConfigs.find(c => c.id === chartId);
@@ -151,6 +152,8 @@ window.openModal = function(chartId) {
 
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
+    
+    let fLocation, fAge;
     if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
@@ -160,19 +163,11 @@ window.openModal = function(chartId) {
     }
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
 
-    if (chartId === 'method') {
-        if(window.checkDataAndToggle('modal-canvas', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('modal-canvas', fDetection);
-    } else if (chartId === 'jurisdiction') {
-        if(window.checkDataAndToggle('modal-canvas', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('modal-canvas', fJurisdiction);
-    } else if (chartId === 'location') {
-        if(window.checkDataAndToggle('modal-canvas', fLocation) && typeof renderLocationChart === 'function') renderLocationChart('modal-canvas', fLocation);
-    } else if (chartId === 'age') {
-        if(window.checkDataAndToggle('modal-canvas', fAge) && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('modal-canvas', fAge);
-    } else if (chartId === 'normalized') {
-        if(window.checkDataAndToggle('modal-canvas', fLicense) && typeof renderNormalizedChart === 'function') renderNormalizedChart('modal-canvas', fLicense);
-    }
-
-    setTimeout(window.enforceInteractiveHighlight, 150);
+    if (chartId === 'method' && typeof renderDetectionChart === 'function') renderDetectionChart('modal-canvas', fDetection);
+    if (chartId === 'jurisdiction' && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('modal-canvas', fJurisdiction);
+    if (chartId === 'location' && typeof renderLocationChart === 'function') renderLocationChart('modal-canvas', fLocation);
+    if (chartId === 'age' && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('modal-canvas', fAge);
+    if (chartId === 'normalized' && typeof renderNormalizedChart === 'function') renderNormalizedChart('modal-canvas', fLicense);
 };
 
 window.fillSelect = function(elementId, items) {
@@ -204,7 +199,6 @@ window.fillSelect = function(elementId, items) {
                 <strong>All</strong>
             </label>
             ${items.map(item => {
-                // if (!item || item === 'Unknown') return '';
                 return `
                     <label style="display: flex; align-items: center; padding: 6px 12px; margin: 0; cursor: pointer; font-size: 13px; color: #334155;">
                         <input type="checkbox" class="filter-checkbox-item" value="${item}" style="margin-right: 8px; cursor: pointer;">
@@ -233,6 +227,10 @@ window.fillSelect = function(elementId, items) {
         e.stopPropagation();
     });
 
+    document.addEventListener('click', () => {
+        list.style.display = 'none';
+    });
+
     allCheckbox.addEventListener('change', () => {
         if (allCheckbox.checked) {
             itemCheckboxes.forEach(cb => cb.checked = false);
@@ -241,7 +239,7 @@ window.fillSelect = function(elementId, items) {
             if (!anyChecked) allCheckbox.checked = true;
         }
         updateHeaderText();
-        if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
+        if (typeof window.updateDashboard === 'function') window.updateDashboard();
     });
 
     itemCheckboxes.forEach(cb => {
@@ -253,7 +251,7 @@ window.fillSelect = function(elementId, items) {
                 if (!anyChecked) allCheckbox.checked = true;
             }
             updateHeaderText();
-            if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
+            if (typeof window.updateDashboard === 'function') window.updateDashboard();
         });
     });
 
@@ -264,6 +262,7 @@ window.fillSelect = function(elementId, items) {
             const checkedItems = Array.from(itemCheckboxes).filter(i => i.checked).map(i => i.value);
             if (checkedItems.length === 0) {
                 textSpan.innerText = 'All';
+                allCheckbox.checked = true;
             } else if (checkedItems.length <= 2) {
                 textSpan.innerText = checkedItems.join(', ');
             } else {

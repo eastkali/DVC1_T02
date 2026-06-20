@@ -1,16 +1,14 @@
 function renderDetectionChart(canvasId, dataset) {
     if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
+    let canvas = document.getElementById(canvasId) || document.querySelector('canvas[id*="method"]');
+    if (!canvas) return;
 
-    let ctx = document.getElementById(canvasId);
-    if (!ctx) ctx = document.querySelector('canvas[id*="method"]');
-    if (!ctx) return;
+    if (typeof Chart !== 'undefined') { let existing = Chart.getChart(canvas); if (existing) existing.destroy(); }
+    const container = d3.select(canvas.parentNode);
+    canvas.style.display = 'none';
+    if (container.node()._d3Observer) container.node()._d3Observer.disconnect();
+    container.selectAll('.d3-svg-wrapper').remove();
 
-    let existingChart = Chart.getChart(ctx);
-    if (existingChart) existingChart.destroy();
-
-    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
-    const solidGray = '#D4D4D8'; 
-    
     const firstRow = dataset[0];
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const methodKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('detect') || k.toLowerCase().includes('method')) || 'DETECTION_METHOD';
@@ -19,311 +17,92 @@ function renderDetectionChart(canvasId, dataset) {
     const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
     const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
-    const selectedMethods = [...new Set(dataset.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
-    const allMethods = [...new Set(window.rawDatasets.main.map(row => row[methodKey]?.toString().trim()))].filter(Boolean).sort();
+    const selectedMethods = [...new Set(dataset.map(r => r[methodKey]?.toString().trim()).filter(Boolean))].sort();
+    const allMethods = [...new Set(window.rawDatasets.main.map(r => r[methodKey]?.toString().trim()).filter(Boolean))].sort();
+    const selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
 
-    const selectedYears = [...new Set(dataset.map(row => row[yearKey]?.toString().trim()))].filter(Boolean).sort((a, b) => {
-        const numA = parseInt(a);
-        const numB = parseInt(b);
-        return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
-    });
-
-    const isSingleYear = selectedYears.length === 1;
-    const isSingleMethod = selectedMethods.length === 1; 
-    
+    const isSingleYear = selectedYears.length === 1; const isSingleMethod = selectedMethods.length === 1; 
     const useBarChart = isSingleYear || isSingleMethod;
+    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
+    const colorScale = d3.scaleOrdinal().domain(allMethods).range(targetColors);
 
-    if (typeof window.selectedDetectionMethod === 'undefined') {
-        window.selectedDetectionMethod = null;
-    }
-    if (window.selectedDetectionMethod && !selectedMethods.includes(window.selectedDetectionMethod)) {
-        window.selectedDetectionMethod = null;
-    }
+    const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
+    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%');
 
-    let chartLabels = [];
-    let chartDatasets = [];
+    let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
+        .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
-    if (useBarChart) {
-        if (isSingleYear && !isSingleMethod) {
-            chartLabels = allMethods;
-            const dataValues = allMethods.map(method => {
-                return dataset
-                    .filter(row => row[methodKey]?.toString().trim() === method)
-                    .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
-            });
+    function draw() {
+        svg.selectAll('*').remove();
+        const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
+        if (cw === 0 || ch === 0) return;
 
-            const finesValues = allMethods.map(method => {
-                return dataset
-                    .filter(row => row[methodKey]?.toString().trim() === method)
-                    .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
-            });
+        const margin = { top: 20, right: 120, bottom: 40, left: 60 };
+        const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
+        const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-            const arrestsValues = allMethods.map(method => {
-                return dataset
-                    .filter(row => row[methodKey]?.toString().trim() === method)
-                    .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
-            });
-
-            const chargesValues = allMethods.map(method => {
-                return dataset
-                    .filter(row => row[methodKey]?.toString().trim() === method)
-                    .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
-            });
-            
-
-            const barColors = selectedMethods.map(method => {
-                return targetColors[allMethods.indexOf(method) % targetColors.length];
-            });
-
-            chartDatasets.push({
-                type: 'bar',
-                label: 'Offenses',
-                data: dataValues,
-                backgroundColor: barColors,
-                borderColor: barColors,
-                borderWidth: 1,
-                borderRadius: 4,
-                fines: finesValues,
-                arrests: arrestsValues,
-                charges: chargesValues,
-            });
-        } else {
-            chartLabels = selectedYears;
+        if (useBarChart) {
+            const labels = isSingleYear && !isSingleMethod ? allMethods : selectedYears;
             const method = selectedMethods[0];
-            const color = targetColors[allMethods.indexOf(method) % targetColors.length];
-
-            const dataValues = selectedYears.map(year => {
-                return dataset
-                    .filter(row => row[yearKey]?.toString().trim() === year)
-                    .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
+            const dataPoints = labels.map(lbl => {
+                const mKey = isSingleYear && !isSingleMethod ? lbl : method;
+                const yKey = isSingleYear && !isSingleMethod ? selectedYears[0] : lbl;
+                const matches = dataset.filter(r => r[methodKey]?.toString().trim() === mKey && r[yearKey]?.toString().trim() === yKey);
+                return { label: lbl, value: matches.reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0),
+                         f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0),
+                         a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0),
+                         c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
             });
 
-            const finesValues = selectedYears.map(year => {
-                return dataset
-                    .filter(row => row[yearKey]?.toString().trim() === year)
-                    .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
+            const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
+            const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
+
+            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
+            g.append('g').call(d3.axisLeft(y));
+
+            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => isSingleYear && !isSingleMethod ? colorScale(d.label) : colorScale(method))
+                .on('mousemove', function(event, d) {
+                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', () => tooltip.style('opacity', 0));
+        } else {
+            const stackData = selectedYears.map(year => {
+                const row = { year: year };
+                selectedMethods.forEach(m => { row[m] = dataset.filter(r => r[yearKey] == year && r[methodKey] == m).reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0); });
+                return row;
             });
 
-            const arrestsValues = selectedYears.map(year => {
-                return dataset
-                    .filter(row => row[yearKey]?.toString().trim() === year)
-                    .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
-            });
+            const stack = d3.stack().keys(selectedMethods)(stackData);
+            const x = d3.scalePoint().domain(selectedYears).range([0, width]);
+            const y = d3.scaleLinear().domain([0, d3.max(stack[stack.length-1] || [{1:0}], d => d[1]) * 1.1]).nice().range([height, 0]);
+            const area = d3.area().x(d => x(d.data.year)).y0(d => y(d[0])).y1(d => y(d[1]));
 
-            const chargesValues = selectedYears.map(year => {
-                return dataset
-                    .filter(row => row[yearKey]?.toString().trim() === year)
-                    .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
-            });
-            
+            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
+            g.append('g').call(d3.axisLeft(y));
 
-            chartDatasets.push({
-                type: 'bar',
-                label: method,
-                data: dataValues,
-                backgroundColor: color,
-                borderColor: color,
-                borderWidth: 1,
-                borderRadius: 4,
-                fines: finesValues,
-                arrests: arrestsValues,
-                charges: chargesValues,
-            });
-        }
-    } else {
-        chartLabels = selectedYears;
+            g.selectAll('path.area').data(stack).enter().append('path').attr('class', d => `area series-${d.key.replace(/\s+/g, '-')}`).attr('d', area).attr('fill', d => colorScale(d.key))
+                .on('mousemove', function(event, d) {
+                    const pointer = d3.pointer(event, this);
+                    const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev);
+                    const pt = d.find(p => p.data.year === closestYear);
+                    d3.select(this).style('opacity', 0.8);
+                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${closestYear})<br>Offenses: ${(pt[1] - pt[0]).toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { d3.select(this).style('opacity', 1); tooltip.style('opacity', 0); });
 
-        const yearlyGrandTotals = selectedYears.map(year => {
-            return dataset
-                .filter(row => 
-                    row[yearKey]?.toString().trim() === year && 
-                    selectedMethods.includes(row[methodKey]?.toString().trim())
-                )
-                .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
-        });
-        selectedMethods.forEach(method => {
-            const baseColor = targetColors[allMethods.indexOf(method) % targetColors.length];
-            let displayColor = baseColor;
-            if (window.selectedDetectionMethod) {
-                displayColor = (window.selectedDetectionMethod === method) ? baseColor : solidGray;
-            }
-
-            const dataValues = selectedYears.map(year => {
-                return dataset
-                    .filter(row => row[yearKey]?.toString().trim() === year && row[methodKey]?.toString().trim() === method)
-                    .reduce((sum, row) => sum + (parseFloat(row[offenseKey]) || 0), 0);
-            });
-
-            chartDatasets.push({
-                type: 'line',
-                label: method,
-                data: dataValues,
-                fill: 'stack',
-                backgroundColor: displayColor,
-                borderColor: displayColor,
-                pointBackgroundColor: displayColor,
-                pointBorderColor: displayColor,
-                tension: 0.1,
-                pointRadius: 3,
-                pointHoverRadius: 6,
-                yearlyGrandTotals: yearlyGrandTotals
-            });
-        });
-    }
-
-    const barLabelPlugin = {
-        id: 'barLabelPlugin',
-        afterDatasetsDraw(chart) {
-            if (!useBarChart) return;
-            const { ctx, data } = chart;
-            chart.data.datasets.forEach((dataset, i) => {
-                const meta = chart.getDatasetMeta(i);
-                meta.data.forEach((bar, index) => {
-                    const dataVal = dataset.data[index];
-                    if (dataVal !== undefined && dataVal !== null && dataVal >= 0) {
-                        ctx.save();
-                        ctx.fillStyle = '#333333';
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'middle';
-                        ctx.font = 'bold 11px sans-serif';
-                        const textStr = dataVal % 1 !== 0 ? dataVal.toFixed(2) : dataVal.toLocaleString();
-                        ctx.translate(bar.x, bar.y);
-                        ctx.rotate(-Math.PI / 2);
-                        ctx.fillText(textStr, 6, 0);
-                        ctx.restore();
-                    }
-                });
-            });
-        }
-    };
-
-    Chart.Tooltip.positioners.cursor = function(elements, eventPosition) {
-        if (!eventPosition || eventPosition.x === undefined || eventPosition.y === undefined) {
-            return false;
-        }
-
-        return {
-            x: eventPosition.x,
-            y: eventPosition.y
-        };
-    };
-
-    new Chart(ctx, {
-        data: { labels: chartLabels, datasets: chartDatasets },
-        plugins: useBarChart ? [barLabelPlugin] : [],
-        options: {
-            interaction: {
-                mode: useBarChart ? 'x' : 'index',
-                intersect: false
-            },
-            layout: { padding: { top: useBarChart ? 25 : 0 } },
-            responsive: true,
-            maintainAspectRatio: false,
-            onClick: (evt, elements, chart) => {
-                if (useBarChart) return;
-
-                const points = chart.getElementsAtEventForMode(evt, 'index', { intersect: false }, true);
-                if (points.length > 0) {
-                    const datasetIndex = points[0].datasetIndex;
-                    const clickedMethod = chart.data.datasets[datasetIndex].label;
-
-                    window.selectedDetectionMethod = (window.selectedDetectionMethod === clickedMethod) ? null : clickedMethod;
-                    chart.data.datasets.forEach(ds => {
-                        const baseColor = targetColors[allMethods.indexOf(ds.label) % targetColors.length];
-                        const isHigh = window.selectedDetectionMethod === null || window.selectedDetectionMethod === ds.label;
-                        ds.borderColor = isHigh ? baseColor : solidGray;
-                        ds.backgroundColor = isHigh ? baseColor : solidGray;
-                        ds.pointBackgroundColor = isHigh ? baseColor : solidGray;
-                        ds.pointBorderColor = isHigh ? baseColor : solidGray;
+            const legend = g.append('g').attr('transform', `translate(${width + 10}, 0)`);
+            selectedMethods.forEach((method, i) => {
+                const row = legend.append('g').attr('transform', `translate(0, ${i * 20})`).style('cursor', 'pointer')
+                    .on('click', function() {
+                        const isDimmed = d3.select(this).style('opacity') === '0.3';
+                        d3.select(this).style('opacity', isDimmed ? '1' : '0.3');
+                        g.selectAll(`.series-${method.replace(/\s+/g, '-')}`).style('display', isDimmed ? 'block' : 'none');
                     });
-                    chart.update();
-                }
-            },
-            plugins: { 
-                legend: { 
-                    display: !useBarChart, 
-                    position: 'right',
-                    labels: { font: { size: 10 }, boxWidth: 12 },
-                    onClick: (evt, legendItem, legend) => {
-                        if (useBarChart) return;
-
-                        const clickedMethod = legendItem.text;
-                        const chart = legend.chart;
-
-                        window.selectedDetectionMethod = (window.selectedDetectionMethod === clickedMethod) ? null : clickedMethod;
-
-                        chart.data.datasets.forEach(ds => {
-                            const baseColor = targetColors[allMethods.indexOf(ds.label) % targetColors.length];
-                            const isHigh = window.selectedDetectionMethod === null || window.selectedDetectionMethod === ds.label;
-                            ds.borderColor = isHigh ? baseColor : solidGray;
-                            ds.backgroundColor = isHigh ? baseColor : solidGray;
-                            ds.pointBackgroundColor = isHigh ? baseColor : solidGray;
-                            ds.pointBorderColor = isHigh ? baseColor : solidGray;
-                        });
-                        chart.update();
-                    }
-                },
-                tooltip: {
-                    position: 'cursor',
-                    callbacks: {
-                        title: (context) => {
-                            if (!useBarChart) {     
-                                const firstItem = context[0];                           
-                                const datasetObj = firstItem.dataset;
-                                const index = firstItem.dataIndex; 
-                                
-                                const yearLabel = firstItem.label
-                                const yearTotal = (datasetObj.yearlyGrandTotals?.[index] || 0).toLocaleString();
-
-                                return `${yearLabel} total: ${yearTotal}`
-                            }
-                        },
-                        label: (context) => {
-                            let labelStr = useBarChart && isSingleYear && !isSingleMethod ? context.label : context.dataset.label;
-
-                            if (useBarChart) {
-                                const datasetObj = context.dataset;
-                                const index = context.dataIndex; 
-
-                                const fines = (datasetObj.fines?.[index] || 0).toLocaleString();
-                                const arrests = (datasetObj.arrests?.[index] || 0).toLocaleString();
-                                const charges = (datasetObj.charges?.[index] || 0).toLocaleString();
-
-                                return [
-                                    `${labelStr}: ${context.raw.toLocaleString()}`,
-                                    `  • Fines Collected: ${fines}`,
-                                    `  • Total Arrests: ${arrests}`,
-                                    `  • Charges Filed: ${charges}`
-                                ];
-                            } else {
-                                return `${labelStr}: ${context.raw.toLocaleString()}`
-                            }
-                           
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: { 
-                    stacked: !useBarChart, 
-                    title: { display: true, text: useBarChart && isSingleYear && !isSingleMethod ? 'Detection Method' : 'Year', font: { weight: 'bold' }, color: '#333' },
-                    display: true,
-                    grid: {
-                        display: true,         
-                        drawOnChartArea: true,  
-                        drawTicks: true,       
-                        offset: useBarChart  
-                    },
-                    ticks: {
-                        autoSkip: true       
-                    }
-                },
-                y: { 
-                    stacked: !useBarChart, 
-                    beginAtZero: true,
-                    title: { display: true, text: 'Total Offenses', font: { weight: 'bold' }, color: '#333' }
-                }
-            }
+                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', colorScale(method)).attr('y', -5).attr('rx', 2);
+                row.append('text').attr('x', 15).attr('y', 4).text(method).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
+            });
         }
-    });
+    }
+    const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
+    ro.observe(wrapper.node()); container.node()._d3Observer = ro;
 }

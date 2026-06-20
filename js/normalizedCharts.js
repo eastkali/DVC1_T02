@@ -1,245 +1,112 @@
 function renderNormalizedChart(canvasId, dataset) {
     if (!dataset || !Array.isArray(dataset) || dataset.length === 0) return;
+    let canvas = document.getElementById(canvasId) || document.querySelector('canvas[id*="normalized"]');
+    if (!canvas) return;
 
-
-    let ctx = document.getElementById(canvasId);
-    if (!ctx) ctx = document.querySelector('canvas[id*="normalized"]');
-    if (!ctx) return;
-
-    let existingChart = Chart.getChart(ctx);
-    if (existingChart) existingChart.destroy();
-
-    // const filters = window.getActiveFilters ? window.getActiveFilters() : { year: ['all'], jurisdiction: ['all'], age: ['all'] };
+    if (typeof Chart !== 'undefined') { let existing = Chart.getChart(canvas); if (existing) existing.destroy(); }
+    const container = d3.select(canvas.parentNode);
+    canvas.style.display = 'none';
+    if (container.node()._d3Observer) container.node()._d3Observer.disconnect();
+    container.selectAll('.d3-svg-wrapper').remove();
 
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
-    const ageKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('age')) || 'AGE_GROUP';
     const normKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('10k') || k.toLowerCase().includes('count')) || 'COUNT_PER_10K';
     const finesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('fines'));
     const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
     const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
-    const licenseHoldersKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('total'));
+    const totalKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'total') || 'Total';
 
-    // const activeYearFilter = (filters.year || ['all']).map(v => v.toString().trim());
-    // const activeJurisFilter = (filters.jurisdiction || ['all']).map(v => v.toString().trim());
-    
-    // let activeAge = filters.age || filters.ageGroup || filters.age_group || ['all'];
-    // const activeAgeFilter = activeAge.map(v => v.toString().trim());
+    const selectedJuris = [...new Set(dataset.map(r => r[jurisKey]?.toString().trim()).filter(Boolean))].sort();
+    const allJuris = [...new Set(window.rawDatasets.main.map(r => r[jurisKey]?.toString().trim()).filter(Boolean))].sort();
+    const selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
 
-    // let dataset = dataset.filter(row => {
-    //     if (!activeYearFilter.includes('all') && row[yearKey] && !activeYearFilter.includes(row[yearKey].toString().trim())) return false;
-    //     if (!activeJurisFilter.includes('all') && row[jurisKey] && !activeJurisFilter.includes(row[jurisKey].toString().trim())) return false;
-    //     if (!activeAgeFilter.includes('all') && ageKey && row[ageKey] && !activeAgeFilter.includes(row[ageKey].toString().trim())) return false;
-    //     return true;
-    // });
+    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
+    const targetShapes = [d3.symbolCircle, d3.symbolSquare, d3.symbolStar, d3.symbolTriangle, d3.symbolDiamond, d3.symbolCross, d3.symbolWye, d3.symbolCircle];
+    const colorScale = d3.scaleOrdinal().domain(allJuris).range(targetColors);
+    const shapeScale = d3.scaleOrdinal().domain(allJuris).range(targetShapes);
 
-    let selectedJurisdictions = [...new Set(dataset.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
-    let allJurisdictions = [...new Set(window.rawDatasets.main.map(row => row[jurisKey] ? row[jurisKey].toString().trim() : '').filter(Boolean))].sort();
-    let years = [...new Set(dataset.map(row => row[yearKey] ? row[yearKey].toString().trim() : '').filter(Boolean))].sort((a, b) => {
-        const numA = parseInt(a.replace(/\D/g, ''));
-        const numB = parseInt(b.replace(/\D/g, ''));
-        return (!isNaN(numA) && !isNaN(numB)) ? numA - numB : a.localeCompare(b);
-    });
-    console.log(dataset)
-    const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#f0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
-    const targetShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot', 'rectRounded'];
-    
-    const isSingleYear = years.length === 1;
-    const isSingleJurisdiction = selectedJurisdictions.length === 1;
-    const useBarChart = isSingleYear || isSingleJurisdiction;
+    const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
+    const svg = wrapper.append('svg').style('width', '100%').style('height', '100%');
 
-    let chartLabels = [];
-    let chartDatasets = [];
+    let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
+        .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
-    if (isSingleYear) {
-        chartLabels = selectedJurisdictions;
-        const activeYearVal = years.length === 1 ? years[0] : activeYearFilter[0];
+    function draw() {
+        svg.selectAll('*').remove();
+        const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
+        if (cw === 0 || ch === 0) return;
 
-        const dataPoints = selectedJurisdictions.map(juris => {
-            const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === activeYearVal);
-            return matches.reduce((sum, row) => sum + (parseFloat(row[normKey]) || 0), 0);
-        });
+        const margin = { top: 20, right: 120, bottom: 45, left: 60 };
+        const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
+        const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
-        chartDatasets = [{
-            data: dataPoints,
-            backgroundColor: selectedJurisdictions.map((_, index) => targetColors[index % targetColors.length]),
-            borderRadius: 4
-        }];
-    } else if (isSingleJurisdiction) {
-        chartLabels = years;
-        const activeJurisVal = selectedJurisdictions[0];
-        const color = targetColors[allJurisdictions.indexOf(activeJurisVal) % targetColors.length];
-
-        const dataPoints = years.map(year => {
-            const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === activeJurisVal && row[yearKey] && row[yearKey].toString().trim() === year);
-            return matches.reduce((sum, row) => sum + (parseFloat(row[normKey]) || 0), 0);
-        });
-
-        const finesValues = years.map(year => {
-            return dataset
-                .filter(row => row[yearKey]?.toString().trim() === year)
-                .reduce((sum, row) => sum + (parseFloat(row[finesKey]) || 0), 0);
-        });
-
-        const arrestsValues = years.map(year => {
-            return dataset
-                .filter(row => row[yearKey]?.toString().trim() === year)
-                .reduce((sum, row) => sum + (parseFloat(row[arrestsKey]) || 0), 0);
-        });
-
-        const chargesValues = years.map(year => {
-            return dataset
-                .filter(row => row[yearKey]?.toString().trim() === year)
-                .reduce((sum, row) => sum + (parseFloat(row[chargesKey]) || 0), 0);
-        });
-
-        const licenseHoldersValues = years.map(year => {
-            return dataset
-                .filter(row => row[yearKey]?.toString().trim() === year)
-                .reduce((sum, row) => sum + (parseFloat(row[licenseHoldersKey]) || 0), 0);
-        });
-
-        chartDatasets = [{
-            label: activeJurisVal,
-            data: dataPoints,
-            backgroundColor: color,
-            borderRadius: 4,
-            fines: finesValues,
-            arrests: arrestsValues,
-            charges: chargesValues,
-            licenseHolders: licenseHoldersValues,
-        }];
-    } else {
-        chartLabels = years;
-        chartDatasets = selectedJurisdictions.map((juris, index) => {
-            const dataPoints = years.map(year => {
-                const matches = dataset.filter(row => row[jurisKey] && row[jurisKey].toString().trim() === juris && row[yearKey] && row[yearKey].toString().trim() === year);
-                return matches.reduce((sum, row) => sum + (parseFloat(row[normKey]) || 0), 0);
+        if (selectedYears.length === 1) {
+            const dataPoints = selectedJuris.map(j => {
+                const matches = dataset.filter(r => r[jurisKey]?.toString().trim() === j && r[yearKey]?.toString().trim() === selectedYears[0]);
+                return { label: j, value: d3.mean(matches, r => parseFloat(r[normKey]) || 0) || 0,
+                         f: d3.sum(matches, r => parseFloat(r[finesKey]) || 0),
+                         a: d3.sum(matches, r => parseFloat(r[arrestsKey]) || 0),
+                         c: d3.sum(matches, r => parseFloat(r[chargesKey]) || 0),
+                         l: d3.max(matches, r => parseFloat(r[totalKey]) || 0) };
             });
-            
-            const color = targetColors[index % targetColors.length];
-            const shape = targetShapes[index % targetShapes.length];
-            
-            return { 
-                label: juris, 
-                data: dataPoints, 
-                borderColor: color, 
-                backgroundColor: color, 
-                pointBackgroundColor: 'transparent', 
-                pointBorderColor: color,
-                pointStyle: shape, 
-                pointRadius: 4,                  
-                pointHoverRadius: 6, 
-                pointBorderWidth: 2, 
-                fill: false, 
-                tension: 0.1 
-            };
-        });
-    }
 
-    const barLabelPlugin = {
-        id: 'topLabels',
-        afterDatasetsDraw(chart) {
-            if (chart.config.type !== 'bar') return;
-            const ctx = chart.ctx;
-            chart.data.datasets.forEach((dataset, i) => {
-                const meta = chart.getDatasetMeta(i);
-                meta.data.forEach((bar, index) => {
-                    const data = dataset.data[index];
-                    if (data) {
-                        ctx.save();
-                        ctx.fillStyle = '#475569';
-                        ctx.textAlign = 'left';
-                        ctx.textBaseline = 'middle';
-                        ctx.font = 'bold 11px sans-serif';
-                        const textStr = data.toLocaleString();
-                        ctx.translate(bar.x, bar.y);
-                        ctx.rotate(-Math.PI / 2);
-                        ctx.fillText(textStr, 6, 0);
-                        ctx.restore();
-                    }
+            const x = d3.scaleBand().domain(selectedJuris).range([0, width]).padding(0.2);
+            const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
+
+            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
+            g.append('g').call(d3.axisLeft(y));
+
+            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.label))
+                .on('mousemove', function(event, d) {
+                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', () => tooltip.style('opacity', 0));
+        } else {
+            const x = d3.scalePoint().domain(selectedYears).range([0, width]).padding(0.5);
+            let maxVal = 0;
+            const lineData = selectedJuris.map(juris => {
+                const values = selectedYears.map(year => {
+                    const matches = dataset.filter(r => r[yearKey] == year && r[jurisKey] == juris);
+                    const sum = d3.mean(matches, r => parseFloat(r[normKey]) || 0) || 0;
+                    if (sum > maxVal) maxVal = sum;
+                    return { year: year, val: sum, f: d3.sum(matches, r => parseFloat(r[finesKey]) || 0), a: d3.sum(matches, r => parseFloat(r[arrestsKey]) || 0), c: d3.sum(matches, r => parseFloat(r[chargesKey]) || 0), l: d3.max(matches, r => parseFloat(r[totalKey]) || 0) };
                 });
+                return { juris: juris, values: values };
+            });
+
+            const y = d3.scaleLinear().domain([0, maxVal * 1.1]).nice().range([height, 0]);
+            
+            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
+            g.append('g').call(d3.axisLeft(y));
+
+            const line = d3.line().x(d => x(d.year)).y(d => y(d.val));
+            const lines = g.selectAll('.line-group').data(lineData).enter().append('g').attr('class', d => `line-group series-${d.juris.replace(/\s+/g, '-')}`);
+
+            lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2);
+            lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2)
+                .on('mousemove', function(event, d) {
+                    d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(150)());
+                    tooltip.style('opacity', 1).html(`<strong>${d.juris}</strong> (${d.year})<br>Rate (Per 10k): ${d.val.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function(event, d) {
+                    d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(50)()); tooltip.style('opacity', 0);
+                });
+
+            const legend = g.append('g').attr('transform', `translate(${width + 10}, 0)`);
+            selectedJuris.forEach((juris, i) => {
+                const row = legend.append('g').attr('transform', `translate(0, ${i * 20})`).style('cursor', 'pointer')
+                    .on('click', function() {
+                        const isDimmed = d3.select(this).style('opacity') === '0.3';
+                        d3.select(this).style('opacity', isDimmed ? '1' : '0.3');
+                        g.selectAll(`.series-${juris.replace(/\s+/g, '-')}`).style('display', isDimmed ? 'block' : 'none');
+                    });
+                row.append('path').attr('d', d3.symbol().type(shapeScale(juris)).size(50)()).attr('transform', 'translate(6,6)').attr('fill', colorScale(juris));
+                row.append('text').attr('x', 15).attr('y', 10).text(juris).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
             });
         }
-    };
-
-    Chart.Tooltip.positioners.cursor = function(elements, eventPosition) {
-        if (!eventPosition || eventPosition.x === undefined || eventPosition.y === undefined) {
-            return false;
-        }
-
-        return {
-            x: eventPosition.x,
-            y: eventPosition.y
-        };
-    };
-
-    new Chart(ctx, {
-        type: useBarChart ? 'bar' : 'line',
-        data: { labels: chartLabels, datasets: chartDatasets },
-        plugins: useBarChart ? [barLabelPlugin] : [], 
-        options: { 
-            interaction: {
-                mode: useBarChart ? 'x' : 'index',
-                intersect: false,
-            },
-            layout: { padding: { top: useBarChart ? 25 : 0 } },
-            responsive: true, maintainAspectRatio: false, 
-            plugins: { 
-                legend: { 
-                    display: !useBarChart, 
-                    position: 'right', 
-                    labels: { font: { size: 10 }, boxWidth: 12 } 
-                },
-                tooltip: {
-                    position: 'cursor',
-                    callbacks: {
-                        label: (context) => {
-                            let labelStr = useBarChart && isSingleYear ? context.label : context.dataset.label;
-
-                            if (useBarChart) {
-                                const datasetObj = context.dataset;
-                                const index = context.dataIndex; 
-
-                                const fines = (datasetObj.fines?.[index] || 0).toLocaleString();
-                                const arrests = (datasetObj.arrests?.[index] || 0).toLocaleString();
-                                const charges = (datasetObj.charges?.[index] || 0).toLocaleString();
-                                const licenseHolders = (datasetObj.licenseHolders?.[index] || 0).toLocaleString();
-
-                                return [
-                                    `${labelStr}: ${context.raw.toLocaleString()}`,
-                                    `  • Fines Collected: ${fines}`,
-                                    `  • Total Arrests: ${arrests}`,
-                                    `  • Charges Filed: ${charges}`,
-                                    `  • License Holders count: ${licenseHolders}`,
-                                    
-                                ];
-                            } else {
-                                return `${labelStr}: ${context.raw.toFixed(2)}`;
-                            }
-                        }
-                    }
-                }
-            }, 
-            scales: { 
-                x: { 
-                    title: { display: true, text: isSingleYear ? 'Jurisdiction' : 'Year', font: { weight: 'bold' }, color: '#333' } ,
-                    grid: {
-                        display: true,         
-                        drawOnChartArea: true,  
-                        drawTicks: true,       
-                        offset: useBarChart  
-                    },
-                    ticks: {
-                        autoSkip: true       
-                    }
-                },
-                y: { 
-                    beginAtZero: true, 
-                    title: { display: true, text: 'Offenses per 10,000 Licenses', font: { weight: 'bold' }, color: '#333' } 
-                } 
-            } 
-        }
-    });
+    }
+    const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
+    ro.observe(wrapper.node()); container.node()._d3Observer = ro;
 }
