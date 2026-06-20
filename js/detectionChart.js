@@ -32,14 +32,28 @@ function renderDetectionChart(canvasId, dataset) {
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
+    let activeSeries = null;
+
     function draw() {
         svg.selectAll('*').remove();
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        const margin = { top: 20, right: 120, bottom: 40, left: 60 };
+        const margin = { top: 20, right: 85, bottom: 45, left: 60 };
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+        function toggleHighlight(key) { activeSeries = activeSeries === key ? null : key; applyHighlight(); }
+
+        function applyHighlight() {
+            if (!activeSeries) {
+                g.selectAll('.area-path, .bar-item, .legend-item').style('opacity', 1);
+            } else {
+                g.selectAll('.bar-item').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
+                g.selectAll('.area-path').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
+                g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
+            }
+        }
 
         if (useBarChart) {
             const labels = isSingleYear && !isSingleMethod ? allMethods : selectedYears;
@@ -48,10 +62,7 @@ function renderDetectionChart(canvasId, dataset) {
                 const mKey = isSingleYear && !isSingleMethod ? lbl : method;
                 const yKey = isSingleYear && !isSingleMethod ? selectedYears[0] : lbl;
                 const matches = dataset.filter(r => r[methodKey]?.toString().trim() === mKey && r[yearKey]?.toString().trim() === yKey);
-                return { label: lbl, value: matches.reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0),
-                         f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0),
-                         a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0),
-                         c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
+                return { label: lbl, value: matches.reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0), f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0), seriesKey: mKey };
             });
 
             const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
@@ -60,11 +71,11 @@ function renderDetectionChart(canvasId, dataset) {
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => isSingleYear && !isSingleMethod ? colorScale(d.label) : colorScale(method))
+            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
-                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', () => tooltip.style('opacity', 0));
+                    if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
+                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.seriesKey));
         } else {
             const stackData = selectedYears.map(year => {
                 const row = { year: year };
@@ -80,28 +91,25 @@ function renderDetectionChart(canvasId, dataset) {
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('path.area').data(stack).enter().append('path').attr('class', d => `area series-${d.key.replace(/\s+/g, '-')}`).attr('d', area).attr('fill', d => colorScale(d.key))
+            g.selectAll('path.area-path').data(stack).enter().append('path').attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('d', area).attr('fill', d => colorScale(d.key))
                 .on('mousemove', function(event, d) {
-                    const pointer = d3.pointer(event, this);
-                    const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev);
-                    const pt = d.find(p => p.data.year === closestYear);
-                    d3.select(this).style('opacity', 0.8);
-                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${closestYear})<br>Offenses: ${(pt[1] - pt[0]).toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { d3.select(this).style('opacity', 1); tooltip.style('opacity', 0); });
+                    if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
+                    const pointer = d3.pointer(event, this); const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); const pt = d.find(p => p.data.year === closestYear);
+                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${closestYear})<br>Offenses: ${(pt[1] - pt[0]).toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.key));
 
-            const legend = g.append('g').attr('transform', `translate(${width + 10}, 0)`);
+            const itemHeight = 22;
+            const legendHeight = selectedMethods.length * itemHeight;
+            const startY = Math.max(0, (height - legendHeight) / 2);
+            const legend = g.append('g').attr('transform', `translate(${width + 10}, ${startY})`);
+
             selectedMethods.forEach((method, i) => {
-                const row = legend.append('g').attr('transform', `translate(0, ${i * 20})`).style('cursor', 'pointer')
-                    .on('click', function() {
-                        const isDimmed = d3.select(this).style('opacity') === '0.3';
-                        d3.select(this).style('opacity', isDimmed ? '1' : '0.3');
-                        g.selectAll(`.series-${method.replace(/\s+/g, '-')}`).style('display', isDimmed ? 'block' : 'none');
-                    });
+                const row = legend.append('g').datum(method).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
                 row.append('rect').attr('width', 10).attr('height', 10).attr('fill', colorScale(method)).attr('y', -5).attr('rx', 2);
                 row.append('text').attr('x', 15).attr('y', 4).text(method).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
             });
         }
+        applyHighlight();
     }
     const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
     ro.observe(wrapper.node()); container.node()._d3Observer = ro;

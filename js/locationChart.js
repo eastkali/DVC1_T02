@@ -41,14 +41,35 @@ function renderLocationChart(canvasId, dataset) {
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
+    let activeSeries = null;
+
+    const formatLegendLabel = (loc) => {
+        if (!loc) return ['Unknown'];
+        if (loc === 'Major Cities of Australia') return ['Major Cities', 'of Australia'];
+        if (loc.includes(' Australia') && loc !== 'Australia') return [loc.replace(' Australia', ''), 'Australia'];
+        return [loc];
+    };
+
     function draw() {
         svg.selectAll('*').remove();
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        const margin = { top: 20, right: 120, bottom: 40, left: 50 };
+        const margin = { top: 20, right: 95, bottom: 45, left: 50 };
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+        function toggleHighlight(key) { activeSeries = activeSeries === key ? null : key; applyHighlight(); }
+
+        function applyHighlight() {
+            if (!activeSeries) {
+                g.selectAll('.layer, .bar-item, .legend-item').style('opacity', 1);
+            } else {
+                g.selectAll('.bar-item').style('opacity', d => d.label === activeSeries ? 1 : 0.1);
+                g.selectAll('.layer').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
+                g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
+            }
+        }
 
         if (useBarChart) {
             const labels = isSingleYear ? selectedLocations : selectedYears;
@@ -67,14 +88,21 @@ function renderLocationChart(canvasId, dataset) {
             const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
 
-            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
+            const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
+            if (isSingleYear) {
+                xAxis.selectAll('.tick text').each(function(d) {
+                    const el = d3.select(this); const lines = formatLegendLabel(d);
+                    el.text(''); lines.forEach((line, i) => el.append('tspan').attr('x', 0).attr('dy', i === 0 ? '0.71em' : '1.2em').text(line));
+                });
+            }
+
             g.append('g').call(d3.axisLeft(y).tickFormat(d => isSingleYear ? d + '%' : d.toLocaleString()));
 
-            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
+            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
                 .on('mousemove', function(event, d) {
-                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', () => tooltip.style('opacity', 0));
+                    if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
+                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(isSingleYear ? d.label : activeVal));
         } else {
             const stackData = selectedYears.map(year => {
                 const row = { year: year };
@@ -96,28 +124,30 @@ function renderLocationChart(canvasId, dataset) {
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
             g.append('g').call(d3.axisLeft(y).tickFormat(d => d + '%'));
 
-            const layers = g.selectAll('.layer').data(stack).enter().append('g').attr('class', d => `layer series-${d.key.replace(/\s+/g, '-')}`).attr('fill', d => colorScale(d.key));
+            const layers = g.selectAll('.layer').data(stack).enter().append('g').attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => colorScale(d.key));
 
-            layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect')
-                .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
+            layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect').style('cursor', 'pointer').attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
                 .on('mousemove', function(event, d) {
-                    d3.select(this).style('opacity', 0.8);
-                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${d.data.year})<br>Share: ${(d[1] - d[0]).toFixed(1)}%<br>Offenses: ${d.data[`${d.key}_raw`].toLocaleString()}<br>• Fines: ${d.data[`${d.key}_f`].toLocaleString()}<br>• Arrests: ${d.data[`${d.key}_a`].toLocaleString()}<br>• Charges: ${d.data[`${d.key}_c`].toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { d3.select(this).style('opacity', 1); tooltip.style('opacity', 0); });
+                    if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
+                    const pct = (d[1] - d[0]).toFixed(1);
+                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${d.data.year})<br>Share: ${pct}%<br>Offenses: ${d.data[`${d.key}_raw`].toLocaleString()}<br>• Fines: ${d.data[`${d.key}_f`].toLocaleString()}<br>• Arrests: ${d.data[`${d.key}_a`].toLocaleString()}<br>• Charges: ${d.data[`${d.key}_c`].toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.key));
 
-            const legend = g.append('g').attr('transform', `translate(${width + 10}, 0)`);
+            const itemHeight = 32;
+            const legendHeight = selectedLocations.length * itemHeight;
+            const startY = Math.max(0, (height - legendHeight) / 2);
+            const legend = g.append('g').attr('transform', `translate(${width + 10}, ${startY})`);
+
             selectedLocations.forEach((loc, i) => {
-                const row = legend.append('g').attr('transform', `translate(0, ${i * 20})`).style('cursor', 'pointer')
-                    .on('click', function() {
-                        const isDimmed = d3.select(this).style('opacity') === '0.3';
-                        d3.select(this).style('opacity', isDimmed ? '1' : '0.3');
-                        g.selectAll(`.series-${loc.replace(/\s+/g, '-')}`).style('display', isDimmed ? 'block' : 'none');
-                    });
+                const row = legend.append('g').datum(loc).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
                 row.append('rect').attr('width', 10).attr('height', 10).attr('fill', colorScale(loc)).attr('y', -5).attr('rx', 2);
-                row.append('text').attr('x', 15).attr('y', 4).text(loc).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
+                const lines = formatLegendLabel(loc);
+                lines.forEach((lineStr, lineIdx) => {
+                    row.append('text').attr('x', 15).attr('y', 4 + (lineIdx * 12)).text(lineStr).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
+                });
             });
         }
+        applyHighlight();
     }
     const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
     ro.observe(wrapper.node()); container.node()._d3Observer = ro;

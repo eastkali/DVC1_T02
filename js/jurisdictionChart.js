@@ -33,22 +33,33 @@ function renderJurisdictionChart(canvasId, dataset) {
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
+    let activeSeries = null;
+
     function draw() {
         svg.selectAll('*').remove();
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        const margin = { top: 20, right: 120, bottom: 45, left: 60 };
+        const margin = { top: 20, right: 60, bottom: 45, left: 60 };
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
+
+        function toggleHighlight(key) { activeSeries = activeSeries === key ? null : key; applyHighlight(); }
+
+        function applyHighlight() {
+            if (!activeSeries) {
+                g.selectAll('.line-group, .legend-item, .bar-item').style('opacity', 1);
+            } else {
+                g.selectAll('.line-group').style('opacity', d => d.juris === activeSeries ? 1 : 0.1);
+                g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
+                g.selectAll('.bar-item').style('opacity', d => d.label === activeSeries ? 1 : 0.1);
+            }
+        }
 
         if (selectedYears.length === 1) {
             const dataPoints = selectedJuris.map(j => {
                 const matches = dataset.filter(r => r[jurisKey]?.toString().trim() === j && r[yearKey]?.toString().trim() === selectedYears[0]);
-                return { label: j, value: matches.reduce((s, r) => s + getValue(r), 0),
-                         f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0),
-                         a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0),
-                         c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
+                return { label: j, value: matches.reduce((s, r) => s + getValue(r), 0), f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
             });
 
             const x = d3.scaleBand().domain(selectedJuris).range([0, width]).padding(0.2);
@@ -57,19 +68,18 @@ function renderJurisdictionChart(canvasId, dataset) {
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.label))
+            g.selectAll('rect').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.label))
                 .on('mousemove', function(event, d) {
-                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', () => tooltip.style('opacity', 0));
+                    if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
+                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.label));
         } else {
             const x = d3.scalePoint().domain(selectedYears).range([0, width]).padding(0.5);
             let maxVal = 0;
             const lineData = selectedJuris.map(juris => {
                 const values = selectedYears.map(year => {
                     const matches = dataset.filter(r => r[yearKey] == year && r[jurisKey] == juris);
-                    const sum = matches.reduce((s, r) => s + getValue(r), 0);
-                    if (sum > maxVal) maxVal = sum;
+                    const sum = matches.reduce((s, r) => s + getValue(r), 0); if (sum > maxVal) maxVal = sum;
                     return { year: year, val: sum, f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
                 });
                 return { juris: juris, values: values };
@@ -81,30 +91,28 @@ function renderJurisdictionChart(canvasId, dataset) {
             g.append('g').call(d3.axisLeft(y));
 
             const line = d3.line().x(d => x(d.year)).y(d => y(d.val));
-            const lines = g.selectAll('.line-group').data(lineData).enter().append('g').attr('class', d => `line-group series-${d.juris.replace(/\s+/g, '-')}`);
+            const lines = g.selectAll('.line-group').data(lineData).enter().append('g').attr('class', 'line-group').style('transition', 'opacity 0.2s');
 
-            lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2);
-            lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2)
+            lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('cursor', 'pointer').on('click', (event, d) => toggleHighlight(d.juris));
+            
+            lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('cursor', 'pointer')
                 .on('mousemove', function(event, d) {
                     d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(150)());
-                    tooltip.style('opacity', 1).html(`<strong>${d.juris}</strong> (${d.year})<br>Offenses: ${d.val.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function(event, d) {
-                    d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(50)()); tooltip.style('opacity', 0);
-                });
+                    tooltip.style('opacity', 1).html(`<strong>${d.juris}</strong> (${d.year})<br>Offenses: ${d.val.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function(event, d) { d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(50)()); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.juris));
 
-            const legend = g.append('g').attr('transform', `translate(${width + 10}, 0)`);
+            const itemHeight = 22;
+            const legendHeight = selectedJuris.length * itemHeight;
+            const startY = Math.max(0, (height - legendHeight) / 2);
+            const legend = g.append('g').attr('transform', `translate(${width + 10}, ${startY})`);
+
             selectedJuris.forEach((juris, i) => {
-                const row = legend.append('g').attr('transform', `translate(0, ${i * 20})`).style('cursor', 'pointer')
-                    .on('click', function() {
-                        const isDimmed = d3.select(this).style('opacity') === '0.3';
-                        d3.select(this).style('opacity', isDimmed ? '1' : '0.3');
-                        g.selectAll(`.series-${juris.replace(/\s+/g, '-')}`).style('display', isDimmed ? 'block' : 'none');
-                    });
-                row.append('path').attr('d', d3.symbol().type(shapeScale(juris)).size(50)()).attr('transform', 'translate(6,6)').attr('fill', colorScale(juris));
+                const row = legend.append('g').datum(juris).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
+                row.append('path').attr('d', d3.symbol().type(shapeScale(juris)).size(50)()).attr('transform', 'translate(6,6)').attr('fill', '#fff').attr('stroke', colorScale(juris)).attr('stroke-width', 2);
                 row.append('text').attr('x', 15).attr('y', 10).text(juris).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
             });
         }
+        applyHighlight(); 
     }
     const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
     ro.observe(wrapper.node()); container.node()._d3Observer = ro;
