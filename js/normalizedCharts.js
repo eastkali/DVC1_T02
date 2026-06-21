@@ -162,14 +162,26 @@ function renderNormalizedChart(canvasId, dataset) {
 
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 20).style('cursor', 'pointer').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('pointer-events', 'none');
+
+            const verticalLine = g.append('line').attr('y1', 0).attr('y2', height).attr('stroke', '#aaa').attr('stroke-width', 1).attr('stroke-dasharray', '3,3').style('opacity', 0);
             
             lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').style('transition', 'all 0.15s ease-out')
-                .attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('cursor', 'pointer')
+                .attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).
+                style('cursor', 'pointer')
+                
+            g.append('rect').attr('width', width).attr('height', height).attr('fill', 'transparent').style('pointer-events', 'all')
                 .on('mousemove', function(event, d) {
+                    const pointer = d3.pointer(event, this); 
                     
+                    const closestYear = selectedYears.reduce((prev, curr) => 
+                        Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev
+                    ); 
+
+                    verticalLine.attr('x1', x(closestYear)).attr('x2', x(closestYear)).style('opacity', 1);
+
                     g.selectAll('.dot').attr('d', dotData => {
-                        if (dotData.year === d.year) {
-                            return d3.symbol().type(shapeScale(dotData.juris)).size(dotData.juris === d.juris ? 200 : 100)();
+                        if (dotData.year === closestYear) {
+                            return d3.symbol().type(shapeScale(dotData.juris)).size(150)();
                         }
                         return d3.symbol().type(shapeScale(dotData.juris)).size(50)();
                     });
@@ -177,7 +189,7 @@ function renderNormalizedChart(canvasId, dataset) {
                     tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
 
                     const yearData = lineData.map(ld => {
-                        const pt = ld.values.find(v => v.year === d.year);
+                        const pt = ld.values.find(v => v.year === closestYear);
                         return { juris: ld.juris, val: pt ? pt.val : 0 };
                     });
 
@@ -186,7 +198,7 @@ function renderNormalizedChart(canvasId, dataset) {
                     let html = `
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-                            ${d.year} Rates (Per 10k)
+                            ${closestYear} Rates (Per 10k)
                         </div>
                     `;
                     
@@ -205,7 +217,8 @@ function renderNormalizedChart(canvasId, dataset) {
 
                     tooltip.style('opacity', 1).html(html)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function(event, d) { 
+                }).on('mouseout', function(event, d) {
+                    verticalLine.style('opacity', 0); 
                     g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
                     tooltip.style('opacity', 0); 
                 }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
