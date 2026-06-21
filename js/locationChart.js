@@ -67,7 +67,6 @@ function renderLocationChart(canvasId, dataset) {
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        // Dynamic margin: Drop right margin to 20px when no legend is needed
         const margin = isSingleYear 
             ? { top: 55, right: 20, bottom: 90, left: 50 } 
             : { top: 20, right: 95, bottom: 90, left: 50 };
@@ -142,6 +141,7 @@ function renderLocationChart(canvasId, dataset) {
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
+                    tooltip.style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
                     tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
@@ -153,8 +153,6 @@ function renderLocationChart(canvasId, dataset) {
                 .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
                 .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
                 .text(d => isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString());
-            
-            // Legend purposely omitted for Single Year
 
         } else {
             const stackData = selectedYears.map(year => {
@@ -190,10 +188,47 @@ function renderLocationChart(canvasId, dataset) {
                 .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
-                    const pct = (d[1] - d[0]).toFixed(1);
-                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${d.data.year})<br>Share: ${pct}%<br>Offenses: ${d.data[`${d.key}_raw`].toLocaleString()}<br>• Fines: ${d.data[`${d.key}_f`].toLocaleString()}<br>• Arrests: ${d.data[`${d.key}_a`].toLocaleString()}<br>• Charges: ${d.data[`${d.key}_c`].toLocaleString()}`)
+
+                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)')
+                           .style('border', 'none')
+                           .style('color', '#fff')
+                           .style('backdrop-filter', 'blur(4px)')
+                           .style('overflow', 'visible');
+
+                    const yearTotalRaw = selectedLocations.reduce((sum, loc) => sum + (d.data[`${loc}_raw`] || 0), 0);
+                    const sortedData = selectedLocations
+                        .map(loc => ({ loc, val: d.data[loc] }))
+                        .filter(item => item.val !== undefined && item.val > 0)
+                        .sort((a, b) => b.val - a.val);
+
+                    let html = `
+                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                            ${d.data.year} Total: ${yearTotalRaw.toLocaleString()}
+                        </div>
+                    `;
+                    
+                    sortedData.forEach(item => {
+                        html += `
+                        <div style="display:flex; justify-content: space-between; align-items:center; gap:16px; margin-top:4px; font-size: 11px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <svg width="10" height="10" style="flex-shrink: 0;"><rect width="10" height="10" rx="2" fill="${colorScale(item.loc)}"></rect></svg>
+                                <span>${item.loc}</span>
+                            </div>
+                            <strong>${item.val.toFixed(1)}%</strong>
+                        </div>`;
+                    });
+
+                    tooltip.style('opacity', 1).html(html)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                }).on('mouseout', function() { 
+                    applyHighlight();
+                    tooltip.style('opacity', 0)
+                           .style('background', 'rgba(255,255,255,0.95)')
+                           .style('border', '1px solid #ccc')
+                           .style('color', '#333')
+                           .style('backdrop-filter', 'none'); 
+                })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
                 
             drawLegend();

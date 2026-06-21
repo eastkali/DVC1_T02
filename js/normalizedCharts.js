@@ -54,11 +54,12 @@ function renderNormalizedChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.line-group, .legend-item, .bar-item, .bar-label').style('opacity', 1);
+                g.selectAll('.line-group, .legend-item, .bar-item, .bar-label, .dot').style('opacity', 1);
             } else {
                 g.selectAll('.line-group').style('opacity', d => d.juris === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
                 g.selectAll('.bar-item, .bar-label').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
+                g.selectAll('.dot').style('opacity', d => d.juris === activeSeries ? 1 : 0.1);
             }
         }
 
@@ -103,6 +104,8 @@ function renderNormalizedChart(canvasId, dataset) {
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
+                    
+                    tooltip.style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none');
                     tooltip.style('opacity', 1).html(`<strong>${d.seriesKey}</strong> (${isSingleYear ? activeVal : d.label})<br>Rate (Per 10k): ${d.value.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
@@ -117,7 +120,7 @@ function renderNormalizedChart(canvasId, dataset) {
             if (!isSingleYear) drawLegend();
 
         } else {
-            const x = d3.scalePoint().domain(selectedYears).range([0, width]).padding(0.5);
+            const x = d3.scalePoint().domain(selectedYears).range([0, width]);
             let maxVal = 0;
             const lineData = selectedJuris.map(juris => {
                 const values = selectedYears.map(year => {
@@ -142,12 +145,52 @@ function renderNormalizedChart(canvasId, dataset) {
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 20).style('cursor', 'pointer').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('pointer-events', 'none');
             
-            lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('cursor', 'pointer')
+            lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').style('transition', 'all 0.15s ease-out')
+                .attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('cursor', 'pointer')
                 .on('mousemove', function(event, d) {
-                    d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(150)());
-                    tooltip.style('opacity', 1).html(`<strong>${d.juris}</strong> (${d.year})<br>Rate (Per 10k): ${d.val.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function(event, d) { d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(50)()); tooltip.style('opacity', 0); })
-                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
+                    
+                    g.selectAll('.dot').attr('d', dotData => {
+                        if (dotData.year === d.year) {
+                            return d3.symbol().type(shapeScale(dotData.juris)).size(dotData.juris === d.juris ? 200 : 100)();
+                        }
+                        return d3.symbol().type(shapeScale(dotData.juris)).size(50)();
+                    });
+
+                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
+
+                    const yearData = lineData.map(ld => {
+                        const pt = ld.values.find(v => v.year === d.year);
+                        return { juris: ld.juris, val: pt ? pt.val : 0 };
+                    });
+
+                    const sortedData = yearData.sort((a, b) => b.val - a.val);
+
+                    let html = `
+                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                            ${d.year} Rates (Per 10k)
+                        </div>
+                    `;
+                    
+                    sortedData.forEach(item => {
+                        html += `
+                        <div style="display:flex; justify-content: space-between; align-items:center; gap:20px; margin-top:4px; font-size: 11px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <svg width="14" height="14" style="flex-shrink: 0; overflow: visible;">
+                                    <path d="${d3.symbol().type(shapeScale(item.juris)).size(40)()}" transform="translate(7,7)" fill="#fff" stroke="${colorScale(item.juris)}" stroke-width="2"></path>
+                                </svg>
+                                <span>${item.juris}</span>
+                            </div>
+                            <strong>${item.val.toFixed(2)}</strong>
+                        </div>`;
+                    });
+
+                    tooltip.style('opacity', 1).html(html)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function(event, d) { 
+                    g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
+                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
+                }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
 
             drawLegend(); 
         }

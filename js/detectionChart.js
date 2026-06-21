@@ -26,7 +26,6 @@ function renderDetectionChart(canvasId, dataset) {
     
     const useDonutChart = isSingleYear;
     const useBarChart = !isSingleYear && isSingleMethod;
-    const useAreaChart = !isSingleYear && !isSingleMethod;
 
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
     const colorScale = d3.scaleOrdinal().domain(allMethods).range(targetColors);
@@ -46,7 +45,7 @@ function renderDetectionChart(canvasId, dataset) {
 
         const margin = useDonutChart 
             ? { top: 20, right: 80, bottom: 20, left: 20 }
-            : { top: 20, right: 80, bottom: 45, left: 60 };
+            : { top: useBarChart ? 55 : 20, right: 80, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -55,9 +54,9 @@ function renderDetectionChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.area-path, .bar-item, .data-dot, .donut-arc, .legend-item').style('opacity', 1);
+                g.selectAll('.area-path, .bar-item, .bar-label, .data-dot, .donut-arc, .legend-item').style('opacity', 1);
             } else {
-                g.selectAll('.bar-item').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
+                g.selectAll('.bar-item, .bar-label').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
                 g.selectAll('.area-path, .data-dot').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
                 g.selectAll('.donut-arc').style('opacity', d => d.data.seriesKey === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
@@ -91,8 +90,8 @@ function renderDetectionChart(canvasId, dataset) {
 
             const pie = d3.pie().value(d => d.value).sort(null);
             
-            const arc = d3.arc().innerRadius(radius * 0.50).outerRadius(radius * 0.95);
-            const arcHover = d3.arc().innerRadius(radius * 0.50).outerRadius(radius * 1.02); 
+            const arc = d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 0.85);
+            const arcHover = d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 0.92); 
 
             gPie.selectAll('path').data(pie(dataPoints)).enter().append('path')
                 .attr('class', 'donut-arc').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
@@ -102,17 +101,24 @@ function renderDetectionChart(canvasId, dataset) {
                     if (!activeSeries || activeSeries === d.data.seriesKey) {
                         d3.select(this).attr('d', arcHover).style('opacity', 0.85);
                     }
+                    
+                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
                     const pct = ((d.data.value / d3.sum(dataPoints, dp => dp.value)) * 100).toFixed(1);
-                    tooltip.style('opacity', 1).html(`<strong>${d.data.label}</strong>: ${d.data.value.toLocaleString()} (${pct}%)<br>• Fines: ${d.data.f.toLocaleString()}<br>• Arrests: ${d.data.a.toLocaleString()}<br>• Charges: ${d.data.c.toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    
+                    let html = `
+                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${d.data.label}</div>
+                        <div style="font-size: 11px;">Offenses: <strong>${d.data.value.toLocaleString()} (${pct}%)</strong><br>• Fines: ${d.data.f.toLocaleString()}<br>• Arrests: ${d.data.a.toLocaleString()}<br>• Charges: ${d.data.c.toLocaleString()}</div>
+                    `;
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function(event, d) {
-                    d3.select(this).attr('d', arc);
-                    applyHighlight(); tooltip.style('opacity', 0);
+                    d3.select(this).attr('d', arc); applyHighlight(); 
+                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none');
                 }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.data.seriesKey); });
 
             const totalVal = d3.sum(dataPoints, d => d.value);
-            gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "14px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
-            gPie.append("text").attr("text-anchor", "middle").attr("dy", "1em").style("font-size", "26px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
+            gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "13px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
+            gPie.append("text").attr("text-anchor", "middle").attr("dy", "1.1em").style("font-size", "22px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
             
             drawLegend();
 
@@ -138,10 +144,24 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
-                    tooltip.style('opacity', 1).html(`<strong>${d.seriesKey}</strong> (${d.label})<br>Offenses: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                    
+                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
+                    
+                    let html = `
+                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${d.seriesKey} (${d.label})</div>
+                        <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
+                    `;
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.seriesKey); });
+            
+            g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
+                .attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
+                .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
+                .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
+                .text(d => d.value.toLocaleString());
             
             drawLegend();
 
@@ -170,12 +190,55 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('d', area).attr('fill', d => colorScale(d.key)).style('stroke', d => colorScale(d.key)).style('stroke-width', 1.5).style('stroke-linejoin', 'round')
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
-                    const pointer = d3.pointer(event, this); const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); const pt = d.find(p => p.data.year === closestYear);
-                    tooltip.style('opacity', 1).html(`<strong>${d.key}</strong> (${closestYear})<br>Offenses: ${(pt[1] - pt[0]).toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
+                    const pointer = d3.pointer(event, this); 
+                    const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); 
+                    
+                    g.selectAll('.data-dot')
+                     .attr('r', dotData => {
+                         if (dotData.data.year === closestYear) {
+                             return dotData.key === d.key ? 7 : 5;
+                         }
+                         return 3; 
+                     })
+                     .style('stroke-width', dotData => dotData.data.year === closestYear ? 2 : 1.5);
+
+                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
+
+                    const yearData = stackData.find(row => row.year === closestYear);
+                    const yearTotalRaw = selectedMethods.reduce((sum, method) => sum + (yearData[method] || 0), 0);
+                    const sortedData = selectedMethods
+                        .map(method => ({ loc: method, val: yearData[method] }))
+                        .filter(item => item.val !== undefined)
+                        .sort((a, b) => b.val - a.val);
+
+                    let html = `
+                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                            ${closestYear} Total: ${yearTotalRaw.toLocaleString()}
+                        </div>
+                    `;
+                    
+                    sortedData.forEach(item => {
+                        html += `
+                        <div style="display:flex; justify-content: space-between; align-items:center; gap:16px; margin-top:4px; font-size: 11px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <svg width="10" height="10" style="flex-shrink: 0;"><rect width="10" height="10" rx="2" fill="${colorScale(item.loc)}"></rect></svg>
+                                <span>${item.loc}</span>
+                            </div>
+                            <strong>${item.val.toLocaleString()}</strong>
+                        </div>`;
+                    });
+
+                    tooltip.style('opacity', 1).html(html)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { 
+                    applyHighlight(); 
+                    g.selectAll('.data-dot').attr('r', 3).style('stroke-width', 1.5);
+                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
+                }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
 
             areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
-                .attr('class', 'data-dot').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
                 .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3)
                 .attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
             
