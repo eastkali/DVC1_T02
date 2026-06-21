@@ -21,9 +21,10 @@ function renderLocationChart(canvasId, dataset) {
     
     const allLocations = [...new Set(window.rawDatasets.main.map(r => r[locKey]?.toString().trim()).filter(Boolean))].sort();
     const getValue = (row) => parseFloat(row[Object.keys(row).find(key => key.toLowerCase().includes('offenses'))]) || 0;
-
     const locTotals = {};
+
     selectedLocations.forEach(loc => { locTotals[loc] = dataset.filter(r => r[locKey] && r[locKey].toString().trim() === loc).reduce((s, r) => s + getValue(r), 0); });
+    selectedLocations = selectedLocations.filter(loc => locTotals[loc] > 0);
     selectedLocations.sort((a, b) => locTotals[b] - locTotals[a]);
 
     const yearlyTotals = {};
@@ -111,21 +112,21 @@ function renderLocationChart(canvasId, dataset) {
             const pc = c === '#000000' || c === '#0072B2' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
             const type = index % 8;
             let overlay = '';
-            if (type===0) overlay = `<circle cx="5" cy="5" r="2.5" fill="${pc}"/>`;
-            else if (type===1) overlay = `<path d="M0,5 l10,0" stroke="${pc}" stroke-width="2.5"/>`;
-            else if (type===2) overlay = `<path d="M5,0 l0,10" stroke="${pc}" stroke-width="2.5"/>`;
-            else if (type===3) overlay = `<path d="M-2,2 l6,-6 M0,10 l10,-10 M8,12 l6,-6" stroke="${pc}" stroke-width="2"/>`;
-            else if (type===4) overlay = `<path d="M-2,8 l6,6 M0,0 l10,10 M8,-2 l6,6" stroke="${pc}" stroke-width="2"/>`;
-            else if (type===5) overlay = `<path d="M5,0 l0,10 M0,5 l10,0" stroke="${pc}" stroke-width="2"/>`;
-            else if (type===6) overlay = `<path d="M-2,2 l6,-6 M0,10 l10,-10 M8,12 l6,-6 M-2,8 l6,6 M0,0 l10,10 M8,-2 l6,6" stroke="${pc}" stroke-width="1.5"/>`;
-            else if (type===7) overlay = `<circle cx="5" cy="5" r="3" fill="none" stroke="${pc}" stroke-width="1.5"/>`;
+            if (type===0) overlay = `<circle cx="7" cy="7" r="3.5" fill="${pc}"/>`;
+            else if (type===1) overlay = `<path d="M0,7 l14,0" stroke="${pc}" stroke-width="3"/>`;
+            else if (type===2) overlay = `<path d="M7,0 l0,14" stroke="${pc}" stroke-width="3"/>`;
+            else if (type===3) overlay = `<path d="M-2,2 l8,-8 M0,14 l14,-14 M10,16 l8,-8" stroke="${pc}" stroke-width="2"/>`;
+            else if (type===4) overlay = `<path d="M-2,12 l8,8 M0,0 l14,14 M10,-2 l8,8" stroke="${pc}" stroke-width="2"/>`;
+            else if (type===5) overlay = `<path d="M7,0 l0,14 M0,7 l14,0" stroke="${pc}" stroke-width="2.5"/>`;
+            else if (type===6) overlay = `<path d="M-2,2 l8,-8 M0,14 l14,-14 M10,16 l8,-8 M-2,12 l8,8 M0,0 l14,14 M10,-2 l8,8" stroke="${pc}" stroke-width="1.5"/>`;
+            else if (type===7) overlay = `<circle cx="7" cy="7" r="4.5" fill="none" stroke="${pc}" stroke-width="2"/>`;
 
-            return `<svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${c}"></rect>${overlay}</svg>`;
+            return `<svg width="14" height="14" style="flex-shrink: 0; border-radius: 3px; overflow: hidden;"><rect width="14" height="14" fill="${c}"></rect>${overlay}</svg>`;
         };
 
         const margin = isSingleYear 
             ? { top: 55, right: 20, bottom: 45, left: 60 } 
-            : { top: (useBarChart ? 55 : 20), right: 95, bottom: 45, left: 60 };
+            : { top: (useBarChart ? 55 : 20), right: 140, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -134,33 +135,34 @@ function renderLocationChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.layer, .bar-item, .bar-label, .legend-item').style('opacity', 1);
+                g.selectAll('.stacked-bar-item, .bar-item, .bar-label, .legend-item').style('opacity', 1);
             } else {
                 g.selectAll('.bar-item, .bar-label').style('opacity', d => (isSingleYear ? d.label : selectedLocations[0]) === activeSeries ? 1 : 0.1);
-                g.selectAll('.layer').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
+                g.selectAll('.stacked-bar-item').style('opacity', d => d.loc === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
             }
         }
 
         const drawLegend = () => {
             const itemHeight = 32;
-            const legendHeight = selectedLocations.length * itemHeight;
+            const legendItems = [...selectedLocations].reverse();
+            const legendHeight = legendItems.length * itemHeight;
             const startY = Math.max(0, (height - legendHeight) / 2);
             
             const legend = g.append('g').attr('transform', `translate(${width + 15}, ${startY})`);
 
-            selectedLocations.forEach((loc, i) => {
+            legendItems.forEach((loc, i) => {
                 const row = legend.append('g').datum(loc).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d); });
-                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', useBarChart ? colorScale(loc) : getPatternFill(loc)).attr('y', -5).attr('rx', 2);
+                row.append('rect').attr('width', 18).attr('height', 18).attr('fill', useBarChart ? colorScale(loc) : getPatternFill(loc)).attr('y', -9).attr('rx', 3);
                 const lines = formatLegendLabel(loc);
                 lines.forEach((lineStr, lineIdx) => {
-                    row.append('text').attr('x', 15).attr('y', 4 + (lineIdx * 12)).text(lineStr).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
+                    row.append('text').attr('x', 24).attr('y', 4 + (lineIdx * 12)).text(lineStr).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
                 });
             });
         };
 
         if (useBarChart) {
-            const labels = isSingleYear ? selectedLocations : selectedYears;
+            const labels = isSingleYear ? [...selectedLocations].reverse() : selectedYears;
             const activeKey = isSingleYear ? yearKey : locKey;
             const activeVal = isSingleYear ? selectedYears[0] : selectedLocations[0];
 
@@ -195,7 +197,7 @@ function renderLocationChart(canvasId, dataset) {
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
-                .attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
+                .attr('fill', d => colorScale(isSingleYear ? d.label : activeVal)) 
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
                     
@@ -203,7 +205,7 @@ function renderLocationChart(canvasId, dataset) {
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${colorScale(isSingleYear ? d.label : activeVal)}"></rect></svg>
+                                <svg width="14" height="14" style="flex-shrink: 0; border-radius: 3px; overflow: hidden;"><rect width="14" height="14" fill="${colorScale(isSingleYear ? d.label : activeVal)}"></rect></svg>
                                 <span>${isSingleYear ? d.label : activeVal} (${isSingleYear ? activeVal : d.label})</span>
                             </div>
                         </div>
@@ -211,7 +213,7 @@ function renderLocationChart(canvasId, dataset) {
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function(event, d) { 
-                    d3.select(this).style('opacity', null);
+                    d3.select(this).style('opacity', null); 
                     applyHighlight(); 
                     tooltip.style('opacity', 0); 
                 })
@@ -225,20 +227,40 @@ function renderLocationChart(canvasId, dataset) {
                 .text(d => isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString());
 
         } else {
-            const stackData = selectedYears.map(year => {
-                const row = { year: year };
+            const rectsData = [];
+            selectedYears.forEach(year => {
+                const yearMatches = dataset.filter(r => r[yearKey] == year);
+                const sumOffenses = yearMatches.reduce((s, r) => s + getValue(r), 0);
+                
+                let yOffset = 0;
+                const yearSegments = [];
+                
                 selectedLocations.forEach(loc => {
-                    const matches = dataset.filter(r => r[yearKey] == year && r[locKey] == loc);
-                    const sum = matches.reduce((s, r) => s + getValue(r), 0);
-                    row[loc] = (sum / yearlyTotals[year]) * 100;
-                    row[`${loc}_raw`] = sum; row[`${loc}_f`] = matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0);
-                    row[`${loc}_a`] = matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0);
-                    row[`${loc}_c`] = matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0);
+                    const locMatches = yearMatches.filter(r => r[locKey] == loc);
+                    const rawSum = locMatches.reduce((s, r) => s + getValue(r), 0);
+                    if (rawSum > 0) {
+                        yearSegments.push({
+                            year: year,
+                            loc: loc,
+                            raw: rawSum,
+                            pct: sumOffenses > 0 ? (rawSum / sumOffenses) * 100 : 0,
+                            f: locMatches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0),
+                            a: locMatches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0),
+                            c: locMatches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0)
+                        });
+                    }
                 });
-                return row;
+                
+                yearSegments.sort((a, b) => b.pct - a.pct);
+                
+                yearSegments.forEach(seg => {
+                    seg.y0 = yOffset;
+                    seg.y1 = yOffset + seg.pct;
+                    yOffset += seg.pct;
+                    rectsData.push(seg);
+                });
             });
 
-            const stack = d3.stack().keys(selectedLocations)(stackData);
             const x = d3.scaleBand().domain(selectedYears).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
 
@@ -250,50 +272,43 @@ function renderLocationChart(canvasId, dataset) {
 
             g.append('g').call(d3.axisLeft(y).tickFormat(d => d + '%'));
 
-            const layers = g.selectAll('.layer').data(stack).enter().append('g')
-                .attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => getPatternFill(d.key));
-
-            layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect')
+            g.selectAll('rect.stacked-bar-item').data(rectsData).enter().append('rect')
+                .attr('class', 'stacked-bar-item')
                 .style('cursor', 'pointer')
                 .style('transition', 'opacity 0.2s')
-                .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => Math.max(0, y(d[0]) - y(d[1]))).attr('width', x.bandwidth())
+                .attr('x', d => x(d.year)).attr('y', d => y(d.y1)).attr('height', d => Math.max(0, y(d.y0) - y(d.y1))).attr('width', x.bandwidth())
+                .attr('fill', d => getPatternFill(d.loc))
                 .on('mousemove', function(event, d) {
                     
-                    if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
+                    if (!activeSeries || activeSeries === d.loc) d3.select(this).style('opacity', 0.8);
 
-                    const yearTotalRaw = selectedLocations.reduce((sum, loc) => sum + (d.data[`${loc}_raw`] || 0), 0);
-
-                    const sortedData = selectedLocations
-                        .map(loc => ({ loc, val: d.data[loc] }))
-                        .filter(item => item.val !== undefined)
-                        .sort((a, b) => b.val - a.val);
+                    const yearSegments = rectsData.filter(r => r.year === d.year);
+                    const yearTotalRaw = yearSegments.reduce((sum, item) => sum + item.raw, 0);
 
                     let html = `
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-                            ${d.data.year} Total: ${yearTotalRaw.toLocaleString()}
+                            ${d.year} Total: ${yearTotalRaw.toLocaleString()}
                         </div>
                     `;
                     
-                    sortedData.forEach(item => {
+                    yearSegments.forEach(item => {
                         html += `
                         <div style="display:flex; justify-content: space-between; align-items:center; gap:16px; margin-top:4px; font-size: 11px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 ${getTooltipIcon(item.loc)}
                                 <span>${item.loc}</span>
                             </div>
-                            <strong>${item.val.toFixed(1)}%</strong>
+                            <strong>${item.pct.toFixed(1)}%</strong>
                         </div>`;
                     });
 
-                    tooltip.style('opacity', 1).html(html)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function(event, d) { 
                     d3.select(this).style('opacity', null);
                     applyHighlight(); 
                     tooltip.style('opacity', 0); 
-                })
-                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
+                }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.loc); });
                 
             drawLegend();
         }
