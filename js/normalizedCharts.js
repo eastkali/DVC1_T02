@@ -31,20 +31,7 @@ function renderNormalizedChart(canvasId, dataset) {
     const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
-        .style('position', 'absolute')
-        .style('background', 'rgba(15, 23, 42, 0.8)')
-        .style('border', 'none')
-        .style('padding', '10px')
-        .style('border-radius', '4px')
-        .style('font-size', '12px')
-        .style('color', '#fff')
-        .style('font-family', 'sans-serif')
-        .style('pointer-events', 'none')
-        .style('box-shadow', '0 4px 6px rgba(0,0,0,0.3)')
-        .style('backdrop-filter', 'blur(4px)')
-        .style('overflow', 'visible')
-        .style('opacity', 0)
-        .style('z-index', 9999);
+        .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
     let activeSeries = null;
     const isSingleYear = selectedYears.length === 1;
@@ -118,14 +105,9 @@ function renderNormalizedChart(canvasId, dataset) {
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
                     
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
-                    
-                    let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
-                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${d.seriesKey} (${isSingleYear ? activeVal : d.label})</div>
-                        <div style="font-size: 11px;">Rate (Per 10k): <strong>${d.value.toFixed(2)}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}</div>
-                    `;
-                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none');
+                    tooltip.style('opacity', 1).html(`<strong>${d.seriesKey}</strong> (${isSingleYear ? activeVal : d.label})<br>Rate (Per 10k): ${d.value.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.seriesKey); });
             
@@ -220,7 +202,7 @@ function renderNormalizedChart(canvasId, dataset) {
                 }).on('mouseout', function(event, d) {
                     verticalLine.style('opacity', 0); 
                     g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
-                    tooltip.style('opacity', 0); 
+                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
                 }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
 
             drawLegend(); 
