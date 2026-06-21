@@ -18,6 +18,8 @@ function renderLocationChart(canvasId, dataset) {
 
     let selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort();
     let selectedLocations = [...new Set(dataset.map(r => r[locKey]?.toString().trim()).filter(Boolean))];
+    
+    const allLocations = [...new Set(window.rawDatasets.main.map(r => r[locKey]?.toString().trim()).filter(Boolean))].sort();
 
     const getValue = (row) => parseFloat(row[Object.keys(row).find(key => key.toLowerCase().includes('offenses'))]) || 0;
 
@@ -29,7 +31,7 @@ function renderLocationChart(canvasId, dataset) {
     selectedYears.forEach(year => { yearlyTotals[year] = dataset.filter(r => r[yearKey] && r[yearKey].toString().trim() === year).reduce((s, r) => s + getValue(r), 0) || 1; });
 
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
-    const colorScale = d3.scaleOrdinal().domain(selectedLocations).range(targetColors);
+    const colorScale = d3.scaleOrdinal().domain(allLocations).range(targetColors);
 
     const isSingleYear = selectedYears.length === 1;
     const isSingleLocation = selectedLocations.length === 1;
@@ -80,6 +82,48 @@ function renderLocationChart(canvasId, dataset) {
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
+        const defs = svg.append('defs');
+        const getPatternFill = (cat) => {
+            const idx = allLocations.indexOf(cat);
+            return idx > -1 ? `url(#pat-${canvasId}-${idx})` : colorScale(cat);
+        };
+
+        allLocations.forEach((cat, index) => {
+            const c = colorScale(cat);
+            const pc = c === '#000000' || c === '#0072B2' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
+            const type = index % 8;
+            const pat = defs.append('pattern').attr('id', `pat-${canvasId}-${index}`).attr('patternUnits', 'userSpaceOnUse').attr('width', 8).attr('height', 8);
+
+            pat.append('rect').attr('width', 8).attr('height', 8).attr('fill', c);
+
+            if (type === 0) pat.append('circle').attr('cx', 4).attr('cy', 4).attr('r', 2).attr('fill', pc);
+            else if (type === 1) pat.append('path').attr('d', 'M0,4 l8,0').attr('stroke', pc).attr('stroke-width', 2);
+            else if (type === 2) pat.append('path').attr('d', 'M4,0 l0,8').attr('stroke', pc).attr('stroke-width', 2);
+            else if (type === 3) pat.append('path').attr('d', 'M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4').attr('stroke', pc).attr('stroke-width', 1.5);
+            else if (type === 4) pat.append('path').attr('d', 'M-2,6 l4,4 M0,0 l8,8 M6,-2 l4,4').attr('stroke', pc).attr('stroke-width', 1.5);
+            else if (type === 5) pat.append('path').attr('d', 'M4,0 l0,8 M0,4 l8,0').attr('stroke', pc).attr('stroke-width', 1.5);
+            else if (type === 6) pat.append('path').attr('d', 'M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4 M-2,6 l4,4 M0,0 l8,8 M6,-2 l4,4').attr('stroke', pc).attr('stroke-width', 1);
+            else if (type === 7) pat.append('circle').attr('cx', 4).attr('cy', 4).attr('r', 2.5).attr('fill', 'none').attr('stroke', pc).attr('stroke-width', 1);
+        });
+
+        const getTooltipIcon = (cat) => {
+            const index = allLocations.indexOf(cat);
+            const c = colorScale(cat);
+            const pc = c === '#000000' || c === '#0072B2' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
+            const type = index % 8;
+            let overlay = '';
+            if (type===0) overlay = `<circle cx="5" cy="5" r="2.5" fill="${pc}"/>`;
+            else if (type===1) overlay = `<path d="M0,5 l10,0" stroke="${pc}" stroke-width="2.5"/>`;
+            else if (type===2) overlay = `<path d="M5,0 l0,10" stroke="${pc}" stroke-width="2.5"/>`;
+            else if (type===3) overlay = `<path d="M-2,2 l6,-6 M0,10 l10,-10 M8,12 l6,-6" stroke="${pc}" stroke-width="2"/>`;
+            else if (type===4) overlay = `<path d="M-2,8 l6,6 M0,0 l10,10 M8,-2 l6,6" stroke="${pc}" stroke-width="2"/>`;
+            else if (type===5) overlay = `<path d="M5,0 l0,10 M0,5 l10,0" stroke="${pc}" stroke-width="2"/>`;
+            else if (type===6) overlay = `<path d="M-2,2 l6,-6 M0,10 l10,-10 M8,12 l6,-6 M-2,8 l6,6 M0,0 l10,10 M8,-2 l6,6" stroke="${pc}" stroke-width="1.5"/>`;
+            else if (type===7) overlay = `<circle cx="5" cy="5" r="3" fill="none" stroke="${pc}" stroke-width="1.5"/>`;
+
+            return `<svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${c}"></rect>${overlay}</svg>`;
+        };
+
         const margin = isSingleYear 
             ? { top: 55, right: 20, bottom: 45, left: 60 } 
             : { top: (useBarChart ? 55 : 20), right: 95, bottom: 45, left: 60 };
@@ -108,7 +152,7 @@ function renderLocationChart(canvasId, dataset) {
 
             selectedLocations.forEach((loc, i) => {
                 const row = legend.append('g').datum(loc).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d); });
-                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', colorScale(loc)).attr('y', -5).attr('rx', 2);
+                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', getPatternFill(loc)).attr('y', -5).attr('rx', 2);
                 const lines = formatLegendLabel(loc);
                 lines.forEach((lineStr, lineIdx) => {
                     row.append('text').attr('x', 15).attr('y', 4 + (lineIdx * 12)).text(lineStr).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
@@ -151,50 +195,24 @@ function renderLocationChart(canvasId, dataset) {
 
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
-                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal));
-
-            g.append('rect')
-                .attr('width', width)
-                .attr('height', height)
-                .attr('fill', 'transparent')
-                .style('pointer-events', 'all')
-                .on('mousemove', function(event) {
-                    const pointer = d3.pointer(event, this); 
-                    const mouseX = pointer[0];
-
-                    const domain = x.domain();
-                    const range = x.range();
-                    const scaleWidth = range[1] - range[0];
-                    
-                    let index = Math.floor((mouseX / scaleWidth) * domain.length);
-                    index = Math.max(0, Math.min(index, domain.length - 1)); 
-                    
-                    const closestCategory = domain[index];
-                    const d = dataPoints.find(item => item.label === closestCategory);
-
-                    if (!d) return;
-
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
-                        return bar.label === closestCategory ? 0.8 : 1;
-                    });    
-                    
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
+                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
+                .attr('fill', d => getPatternFill(isSingleYear ? d.label : activeVal))
+                .on('mousemove', function(event, d) {
+                    if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
                     
                     let html = `
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
-                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${d.label}</div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                ${getTooltipIcon(isSingleYear ? d.label : activeVal)}
+                                <span>${isSingleYear ? d.label : activeVal} (${isSingleYear ? activeVal : d.label})</span>
+                            </div>
+                        </div>
                         <div style="font-size: 11px;">Offenses: <strong>${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { 
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
-                        return 1;
-                    });
-                    applyHighlight(); 
-                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
-                })
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(isSingleYear ? d.label : activeVal); });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
                 .attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
@@ -230,19 +248,13 @@ function renderLocationChart(canvasId, dataset) {
             g.append('g').call(d3.axisLeft(y).tickFormat(d => d + '%'));
 
             const layers = g.selectAll('.layer').data(stack).enter().append('g')
-                .attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => colorScale(d.key));
+                .attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => getPatternFill(d.key));
 
             layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect')
                 .style('cursor', 'pointer')
                 .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
-
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)')
-                           .style('border', 'none')
-                           .style('color', '#fff')
-                           .style('backdrop-filter', 'blur(4px)')
-                           .style('overflow', 'visible');
 
                     const yearTotalRaw = selectedLocations.reduce((sum, loc) => sum + (d.data[`${loc}_raw`] || 0), 0);
 
@@ -262,7 +274,7 @@ function renderLocationChart(canvasId, dataset) {
                         html += `
                         <div style="display:flex; justify-content: space-between; align-items:center; gap:16px; margin-top:4px; font-size: 11px;">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <svg width="10" height="10" style="flex-shrink: 0;"><rect width="10" height="10" rx="2" fill="${colorScale(item.loc)}"></rect></svg>
+                                ${getTooltipIcon(item.loc)}
                                 <span>${item.loc}</span>
                             </div>
                             <strong>${item.val.toFixed(1)}%</strong>
@@ -271,10 +283,7 @@ function renderLocationChart(canvasId, dataset) {
 
                     tooltip.style('opacity', 1).html(html)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { 
-                    applyHighlight(); 
-                    tooltip.style('opacity', 0); 
-                })
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
                 
             drawLegend();
