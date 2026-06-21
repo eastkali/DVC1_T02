@@ -18,9 +18,7 @@ function renderDetectionChart(canvasId, dataset) {
     const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
     const selectedMethods = [...new Set(dataset.map(r => r[methodKey]?.toString().trim()).filter(Boolean))].sort();
-    
     const allMethods = [...new Set(window.rawDatasets.main.map(r => r[methodKey]?.toString().trim()).filter(Boolean))].sort();
-    
     const selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
 
     const isSingleYear = selectedYears.length === 1; 
@@ -140,6 +138,8 @@ function renderDetectionChart(canvasId, dataset) {
                 return { label: m, value: matches.reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0), f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0), seriesKey: m };
             }).filter(d => d.value > 0); 
 
+            const totalVal = d3.sum(dataPoints, d => d.value);
+
             const centerX = width / 2;
             const centerY = height / 2;
             const radius = Math.min(width, height) / 2;
@@ -160,17 +160,17 @@ function renderDetectionChart(canvasId, dataset) {
                         d3.select(this).style('opacity', 0.8);
                     }
                     
-                    const pct = ((d.data.value / d3.sum(dataPoints, dp => dp.value)) * 100).toFixed(1);
+                    const pct = ((d.data.value / totalVal) * 100).toFixed(1);
                     
                     let html = `
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 ${getTooltipIcon(d.data.seriesKey)}
-                                <span>${d.data.label}</span>
+                                <span>${d.data.label} (${selectedYears[0]})</span>
                             </div>
                         </div>
-                        <div style="font-size: 11px;">Offenses: <strong>${d.data.value.toLocaleString()} (${pct}%)</strong><br>• Fines: ${d.data.f.toLocaleString()}<br>• Arrests: ${d.data.a.toLocaleString()}<br>• Charges: ${d.data.c.toLocaleString()}</div>
+                        <div style="font-size: 11px;">Offences: <strong>${d.data.value.toLocaleString()} (${pct}%)</strong><br>• Fines: ${d.data.f.toLocaleString()}<br>• Arrests: ${d.data.a.toLocaleString()}<br>• Charges: ${d.data.c.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function(event, d) {
@@ -184,7 +184,6 @@ function renderDetectionChart(canvasId, dataset) {
             gPie.selectAll('polyline').data(pie(dataPoints)).enter().append('polyline')
                 .attr('class', 'slice-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('points', d => {
-                    if ((d.endAngle - d.startAngle) < 0.15) return '';
                     const posA = arc.centroid(d);
                     const posB = outerArc.centroid(d);
                     const posC = [...posB];
@@ -206,11 +205,10 @@ function renderDetectionChart(canvasId, dataset) {
                 .style('font-weight', '600')
                 .style('fill', '#334155')
                 .text(d => {
-                    if ((d.endAngle - d.startAngle) < 0.15) return '';
-                    return d.data.value.toLocaleString(); 
+                    const pct = ((d.data.value / totalVal) * 100).toFixed(1);
+                    return `${d.data.value.toLocaleString()} (${pct}%)`; 
                 });
 
-            const totalVal = d3.sum(dataPoints, d => d.value);
             gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "13px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
             gPie.append("text").attr("text-anchor", "middle").attr("dy", "1.1em").style("font-size", "22px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
             
@@ -274,7 +272,7 @@ function renderDetectionChart(canvasId, dataset) {
                                 <span>${d.seriesKey} (${d.label})</span>
                             </div>
                         </div>
-                        <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
+                        <div style="font-size: 11px;">Offences: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { 
@@ -328,6 +326,11 @@ function renderDetectionChart(canvasId, dataset) {
             g.append('g').call(d3.axisLeft(y));
 
             const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
+
+            areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
+                .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
+                .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3) 
+                .attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
 
             areas.append('path')
                 .attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer')

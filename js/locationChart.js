@@ -137,10 +137,10 @@ function renderLocationChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.layer, .bar-item, .bar-label, .legend-item').style('opacity', 1);
+                g.selectAll('.stacked-bar-item, .bar-item, .bar-label, .legend-item').style('opacity', 1);
             } else {
                 g.selectAll('.bar-item, .bar-label').style('opacity', d => (isSingleYear ? d.label : selectedLocations[0]) === activeSeries ? 1 : 0.1);
-                g.selectAll('.layer').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
+                g.selectAll('.stacked-bar-item').style('opacity', d => d.loc === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
             }
         }
@@ -196,13 +196,11 @@ function renderLocationChart(canvasId, dataset) {
 
             g.append('g').call(d3.axisLeft(y).tickFormat(d => isSingleYear ? d + '%' : d.toLocaleString()));
 
-            // RESTORED: Bar Chart pointer-events disabled on rects
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
                 .attr('fill', d => colorScale(isSingleYear ? d.label : activeVal));
 
-            // RESTORED: Groupmate's custom hover overlay
             g.append('rect')
                 .attr('width', width)
                 .attr('height', height)
@@ -223,9 +221,7 @@ function renderLocationChart(canvasId, dataset) {
                     const d = dataPoints.find(item => item.label === closestCategory);
 
                     if (!d) return;
-
                     g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && (isSingleYear ? bar.label : activeVal) !== activeSeries) return 0.1;
                         return bar.label === closestCategory ? 0.8 : 1;
                     });
 
@@ -243,26 +239,8 @@ function renderLocationChart(canvasId, dataset) {
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { 
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && (isSingleYear ? bar.label : activeVal) !== activeSeries) return 0.1;
-                        return 1;
-                    });
-                    applyHighlight(); 
+                    g.selectAll('rect.bar-item').style('opacity', 1);
                     tooltip.style('opacity', 0); 
-                }).on('click', function(event) { 
-                    const pointer = d3.pointer(event, this); 
-                    const mouseX = pointer[0];
-                    const domain = x.domain();
-                    const range = x.range();
-                    const scaleWidth = range[1] - range[0];
-                    let index = Math.floor((mouseX / scaleWidth) * domain.length);
-                    index = Math.max(0, Math.min(index, domain.length - 1)); 
-                    const closestCategory = domain[index];
-                    const d = dataPoints.find(item => item.label === closestCategory);
-                    if (d) {
-                        event.stopPropagation();
-                        toggleHighlight(isSingleYear ? d.label : activeVal);
-                    }
                 });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
