@@ -174,6 +174,8 @@ function renderDetectionChart(canvasId, dataset) {
             const y = d3.scaleLinear().domain([0, d3.max(stack[stack.length-1] || [{1:0}], d => d[1]) * 1.1]).nice().range([height, 0]);
             const area = d3.area().x(d => x(d.data.year)).y0(d => y(d[0])).y1(d => y(d[1]));
 
+            drawLegend();
+
             g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
             g.selectAll('.grid-lines path').style('display', 'none');
 
