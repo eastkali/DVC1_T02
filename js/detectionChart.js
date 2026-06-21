@@ -43,7 +43,7 @@ function renderDetectionChart(canvasId, dataset) {
         svg.selectAll('*').remove();
 
         const margin = useDonutChart 
-            ? { top: 20, right: isSingleMethod ? 20 : 80, bottom: 20, left: 20 }
+            ? { top: 20, right: isSingleMethod ? 20 : 100, bottom: 20, left: 20 }
             : { top: useBarChart ? 55 : 20, right: isSingleMethod ? 20 : 90, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
