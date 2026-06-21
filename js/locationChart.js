@@ -68,8 +68,8 @@ function renderLocationChart(canvasId, dataset) {
         if (cw === 0 || ch === 0) return;
 
         const margin = isSingleYear 
-            ? { top: 55, right: 20, bottom: 90, left: 50 } 
-            : { top: 20, right: 95, bottom: 90, left: 50 };
+            ? { top: 55, right: 20, bottom: 45, left: 60 } 
+            : { top: (useBarChart ? 55 : 20), right: 95, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -141,6 +141,7 @@ function renderLocationChart(canvasId, dataset) {
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
+                    
                     tooltip.style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
                     tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
@@ -196,9 +197,10 @@ function renderLocationChart(canvasId, dataset) {
                            .style('overflow', 'visible');
 
                     const yearTotalRaw = selectedLocations.reduce((sum, loc) => sum + (d.data[`${loc}_raw`] || 0), 0);
+
                     const sortedData = selectedLocations
                         .map(loc => ({ loc, val: d.data[loc] }))
-                        .filter(item => item.val !== undefined && item.val > 0)
+                        .filter(item => item.val !== undefined)
                         .sort((a, b) => b.val - a.val);
 
                     let html = `
@@ -222,7 +224,7 @@ function renderLocationChart(canvasId, dataset) {
                     tooltip.style('opacity', 1).html(html)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { 
-                    applyHighlight();
+                    applyHighlight(); 
                     tooltip.style('opacity', 0)
                            .style('background', 'rgba(255,255,255,0.95)')
                            .style('border', '1px solid #ccc')

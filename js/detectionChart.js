@@ -35,7 +35,6 @@ function renderDetectionChart(canvasId, dataset) {
 
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
-
     let activeSeries = null;
 
     function draw() {
@@ -44,8 +43,8 @@ function renderDetectionChart(canvasId, dataset) {
         svg.selectAll('*').remove();
 
         const margin = useDonutChart 
-            ? { top: 20, right: 80, bottom: 20, left: 20 }
-            : { top: useBarChart ? 55 : 20, right: 80, bottom: 45, left: 60 };
+            ? { top: 20, right: isSingleMethod ? 20 : 80, bottom: 20, left: 20 }
+            : { top: useBarChart ? 55 : 20, right: isSingleMethod ? 20 : 80, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -80,16 +79,14 @@ function renderDetectionChart(canvasId, dataset) {
             const dataPoints = allMethods.map(m => {
                 const matches = dataset.filter(r => r[methodKey]?.toString().trim() === m && r[yearKey]?.toString().trim() === selectedYears[0]);
                 return { label: m, value: matches.reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0), f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0), seriesKey: m };
-            }).filter(d => d.value > 0);
+            }).filter(d => d.value > 0); 
 
             const centerX = width / 2;
             const centerY = height / 2;
             const radius = Math.min(width, height) / 2;
             
             const gPie = g.append("g").attr("transform", `translate(${centerX},${centerY})`);
-
             const pie = d3.pie().value(d => d.value).sort(null);
-            
             const arc = d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 0.85);
             const arcHover = d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 0.92); 
 
@@ -120,7 +117,7 @@ function renderDetectionChart(canvasId, dataset) {
             gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "13px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
             gPie.append("text").attr("text-anchor", "middle").attr("dy", "1.1em").style("font-size", "22px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
             
-            drawLegend();
+            if (!isSingleMethod) drawLegend();
 
         } else if (useBarChart) {
             const method = selectedMethods[0];
@@ -163,7 +160,7 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
                 .text(d => d.value.toLocaleString());
             
-            drawLegend();
+            if (!isSingleMethod) drawLegend();
 
         } else { 
             const stackData = selectedYears.map(year => {
@@ -206,6 +203,7 @@ function renderDetectionChart(canvasId, dataset) {
 
                     const yearData = stackData.find(row => row.year === closestYear);
                     const yearTotalRaw = selectedMethods.reduce((sum, method) => sum + (yearData[method] || 0), 0);
+
                     const sortedData = selectedMethods
                         .map(method => ({ loc: method, val: yearData[method] }))
                         .filter(item => item.val !== undefined)
@@ -220,7 +218,7 @@ function renderDetectionChart(canvasId, dataset) {
                     
                     sortedData.forEach(item => {
                         html += `
-                        <div style="display:flex; justify-content: space-between; align-items:center; gap:16px; margin-top:4px; font-size: 11px;">
+                        <div style="display:flex; justify-content: space-between; align-items:center; gap:20px; margin-top:4px; font-size: 11px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <svg width="10" height="10" style="flex-shrink: 0;"><rect width="10" height="10" rx="2" fill="${colorScale(item.loc)}"></rect></svg>
                                 <span>${item.loc}</span>
@@ -241,8 +239,6 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
                 .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3)
                 .attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
-            
-            drawLegend();
         }
         applyHighlight();
     }
