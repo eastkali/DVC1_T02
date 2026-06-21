@@ -35,6 +35,8 @@ function renderAgeGroupChart(canvasId, dataset) {
 
     let activeSeries = null;
     const isSingleYear = selectedYears.length === 1;
+    const isSingleAge = selectedAges.length === 1;
+    const useBarChart = isSingleYear || isSingleAge;
 
     function draw() {
         svg.selectAll('*').remove();
@@ -42,8 +44,8 @@ function renderAgeGroupChart(canvasId, dataset) {
         if (cw === 0 || ch === 0) return;
 
         const margin = isSingleYear 
-            ? { top: 20, right: 20, bottom: 70, left: 60 } 
-            : { top: 20, right: 85, bottom: 45, left: 60 };
+            ? { top: 55, right: 20, bottom: 70, left: 60 } 
+            : { top: (useBarChart ? 55 : 20), right: 85, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -52,11 +54,11 @@ function renderAgeGroupChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.line-group, .legend-item, .bar-item').style('opacity', 1);
+                g.selectAll('.line-group, .legend-item, .bar-item, .bar-label').style('opacity', 1);
             } else {
                 g.selectAll('.line-group').style('opacity', d => d.age === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
-                g.selectAll('.bar-item').style('opacity', d => d.label === activeSeries ? 1 : 0.1);
+                g.selectAll('.bar-item, .bar-label').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
             }
         }
 
@@ -73,31 +75,48 @@ function renderAgeGroupChart(canvasId, dataset) {
             });
         };
 
-        if (isSingleYear) {
-            const dataPoints = selectedAges.map(age => {
-                const matches = dataset.filter(r => r[ageKey]?.toString().trim() === age && r[yearKey]?.toString().trim() === selectedYears[0]);
-                return { label: age, value: matches.reduce((s, r) => s + getValue(r), 0), f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
+        if (useBarChart) {
+            const labels = isSingleYear ? selectedAges : selectedYears;
+            const activeKey = isSingleYear ? yearKey : ageKey;
+            const activeVal = isSingleYear ? selectedYears[0] : selectedAges[0];
+
+            const dataPoints = labels.map(lbl => {
+                const matches = dataset.filter(r => r[activeKey]?.toString().trim() === activeVal && r[isSingleYear ? ageKey : yearKey]?.toString().trim() === lbl);
+                const sum = matches.reduce((s, r) => s + getValue(r), 0);
+                return { label: lbl, value: sum, 
+                         f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), 
+                         a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), 
+                         c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0),
+                         seriesKey: isSingleYear ? lbl : activeVal };
             });
 
-            const x = d3.scaleBand().domain(selectedAges).range([0, width]).padding(0.2);
+            const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
 
             g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
             g.selectAll('.grid-lines path').style('display', 'none');
 
-            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "translate(-10,0)rotate(-45)")
-                .style("text-anchor", "end");
-                
+            const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
+            xAxis.selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
+
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.label))
+            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
+                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
-                    if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
-                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
+                    tooltip.style('opacity', 1).html(`<strong>${d.seriesKey}</strong> (${isSingleYear ? activeVal : d.label})<br>Offenses: ${d.value.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
-                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.label); });
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.seriesKey); });
+            
+            g.selectAll('text.bar-label').data(dataPoints).enter().append('text').attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
+                .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
+                .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
+                .text(d => d.value.toLocaleString());
+
+            if (!isSingleYear) drawLegend();
 
         } else {
             const x = d3.scalePoint().domain(selectedYears).range([0, width]).padding(0.5);
@@ -131,7 +150,7 @@ function renderAgeGroupChart(canvasId, dataset) {
                     tooltip.style('opacity', 1).html(`<strong>${d.age}</strong> (${d.year})<br>Offenses: ${d.val.toLocaleString()}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function(event, d) { d3.select(this).attr('d', d3.symbol().type(shapeScale(d.age)).size(50)()); tooltip.style('opacity', 0); }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.age); });
 
-            drawLegend();
+            drawLegend(); 
         }
         applyHighlight(); 
     }

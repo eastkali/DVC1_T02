@@ -67,7 +67,11 @@ function renderLocationChart(canvasId, dataset) {
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        const margin = { top: 20, right: 95, bottom: 90, left: 50 };
+        // Dynamic margin: Drop right margin to 20px when no legend is needed
+        const margin = isSingleYear 
+            ? { top: 55, right: 20, bottom: 90, left: 50 } 
+            : { top: 20, right: 95, bottom: 90, left: 50 };
+
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -75,9 +79,9 @@ function renderLocationChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.layer, .bar-item, .legend-item').style('opacity', 1);
+                g.selectAll('.layer, .bar-item, .bar-label, .legend-item').style('opacity', 1);
             } else {
-                g.selectAll('.bar-item').style('opacity', d => (isSingleYear ? d.label : selectedLocations[0]) === activeSeries ? 1 : 0.1);
+                g.selectAll('.bar-item, .bar-label').style('opacity', d => (isSingleYear ? d.label : selectedLocations[0]) === activeSeries ? 1 : 0.1);
                 g.selectAll('.layer').style('opacity', d => d.key === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
             }
@@ -121,7 +125,6 @@ function renderLocationChart(canvasId, dataset) {
             g.selectAll('.grid-lines path').style('display', 'none');
 
             const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
-            
             xAxis.selectAll('.tick text')
                 .attr("transform", "translate(-10,0)rotate(-45)")
                 .style("text-anchor", "end")
@@ -144,7 +147,14 @@ function renderLocationChart(canvasId, dataset) {
                 }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(isSingleYear ? d.label : activeVal); });
             
-            drawLegend();
+            g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
+                .attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
+                .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
+                .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
+                .text(d => isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString());
+            
+            // Legend purposely omitted for Single Year
 
         } else {
             const stackData = selectedYears.map(year => {
@@ -168,9 +178,7 @@ function renderLocationChart(canvasId, dataset) {
             g.selectAll('.grid-lines path').style('display', 'none');
 
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x))
-                .selectAll("text")
-                .attr("transform", "translate(-10,0)rotate(-45)")
-                .style("text-anchor", "end");
+                .selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
 
             g.append('g').call(d3.axisLeft(y).tickFormat(d => d + '%'));
 

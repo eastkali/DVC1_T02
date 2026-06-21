@@ -24,7 +24,6 @@ function renderDetectionChart(canvasId, dataset) {
     const isSingleYear = selectedYears.length === 1; 
     const isSingleMethod = selectedMethods.length === 1; 
     
-
     const useDonutChart = isSingleYear;
     const useBarChart = !isSingleYear && isSingleMethod;
     const useAreaChart = !isSingleYear && !isSingleMethod;
@@ -45,7 +44,9 @@ function renderDetectionChart(canvasId, dataset) {
         if (cw === 0 || ch === 0) return;
         svg.selectAll('*').remove();
 
-        const margin = { top: 20, right: 80, bottom: 45, left: 60 };
+        const margin = useDonutChart 
+            ? { top: 20, right: 80, bottom: 20, left: 20 }
+            : { top: 20, right: 80, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -87,10 +88,11 @@ function renderDetectionChart(canvasId, dataset) {
             const radius = Math.min(width, height) / 2;
             
             const gPie = g.append("g").attr("transform", `translate(${centerX},${centerY})`);
+
             const pie = d3.pie().value(d => d.value).sort(null);
-        
-            const arc = d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 0.85);
-            const arcHover = d3.arc().innerRadius(radius * 0.55).outerRadius(radius * 0.92); 
+            
+            const arc = d3.arc().innerRadius(radius * 0.50).outerRadius(radius * 0.95);
+            const arcHover = d3.arc().innerRadius(radius * 0.50).outerRadius(radius * 1.02); 
 
             gPie.selectAll('path').data(pie(dataPoints)).enter().append('path')
                 .attr('class', 'donut-arc').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
@@ -109,8 +111,8 @@ function renderDetectionChart(canvasId, dataset) {
                 }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.data.seriesKey); });
 
             const totalVal = d3.sum(dataPoints, d => d.value);
-            gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "13px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
-            gPie.append("text").attr("text-anchor", "middle").attr("dy", "1.1em").style("font-size", "22px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
+            gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "14px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
+            gPie.append("text").attr("text-anchor", "middle").attr("dy", "1em").style("font-size", "26px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
             
             drawLegend();
 

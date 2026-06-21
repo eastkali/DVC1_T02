@@ -34,13 +34,19 @@ function renderNormalizedChart(canvasId, dataset) {
         .style('position', 'absolute').style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('padding', '10px').style('border-radius', '4px').style('font-size', '12px').style('color', '#333').style('font-family', 'sans-serif').style('pointer-events', 'none').style('box-shadow', '0 2px 5px rgba(0,0,0,0.15)').style('opacity', 0).style('z-index', 9999);
 
     let activeSeries = null;
+    const isSingleYear = selectedYears.length === 1;
+    const isSingleJuris = selectedJuris.length === 1;
+    const useBarChart = isSingleYear || isSingleJuris;
 
     function draw() {
         svg.selectAll('*').remove();
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        const margin = { top: 20, right: 55, bottom: 45, left: 60 };
+        const margin = isSingleYear 
+            ? { top: 55, right: 20, bottom: 45, left: 60 } 
+            : { top: (useBarChart ? 55 : 20), right: 60, bottom: 45, left: 60 };
+
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
@@ -48,36 +54,68 @@ function renderNormalizedChart(canvasId, dataset) {
 
         function applyHighlight() {
             if (!activeSeries) {
-                g.selectAll('.line-group, .legend-item, .bar-item').style('opacity', 1);
+                g.selectAll('.line-group, .legend-item, .bar-item, .bar-label').style('opacity', 1);
             } else {
                 g.selectAll('.line-group').style('opacity', d => d.juris === activeSeries ? 1 : 0.1);
                 g.selectAll('.legend-item').style('opacity', d => d === activeSeries ? 1 : 0.1);
-                g.selectAll('.bar-item').style('opacity', d => d.label === activeSeries ? 1 : 0.1);
+                g.selectAll('.bar-item, .bar-label').style('opacity', d => d.seriesKey === activeSeries ? 1 : 0.1);
             }
         }
 
-        if (selectedYears.length === 1) {
-            const dataPoints = selectedJuris.map(j => {
-                const matches = dataset.filter(r => r[jurisKey]?.toString().trim() === j && r[yearKey]?.toString().trim() === selectedYears[0]);
-                return { label: j, value: d3.mean(matches, r => parseFloat(r[normKey]) || 0) || 0,
+        const drawLegend = () => {
+            const itemHeight = 22;
+            const legendHeight = selectedJuris.length * itemHeight;
+            const startY = Math.max(0, (height - legendHeight) / 2);
+            const legend = g.append('g').attr('transform', `translate(${width + 15}, ${startY})`);
+
+            selectedJuris.forEach((juris, i) => {
+                const row = legend.append('g').datum(juris).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d); });
+                row.append('path').attr('d', d3.symbol().type(shapeScale(juris)).size(50)()).attr('transform', 'translate(6,6)').attr('fill', '#fff').attr('stroke', colorScale(juris)).attr('stroke-width', 2);
+                row.append('text').attr('x', 15).attr('y', 10).text(juris).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
+            });
+        };
+
+        if (useBarChart) {
+            const labels = isSingleYear ? selectedJuris : selectedYears;
+            const activeKey = isSingleYear ? yearKey : jurisKey;
+            const activeVal = isSingleYear ? selectedYears[0] : selectedJuris[0];
+
+            const dataPoints = labels.map(lbl => {
+                const matches = dataset.filter(r => r[activeKey]?.toString().trim() === activeVal && r[isSingleYear ? jurisKey : yearKey]?.toString().trim() === lbl);
+                return { label: lbl, value: d3.mean(matches, r => parseFloat(r[normKey]) || 0) || 0,
                          f: d3.sum(matches, r => parseFloat(r[finesKey]) || 0), a: d3.sum(matches, r => parseFloat(r[arrestsKey]) || 0),
-                         c: d3.sum(matches, r => parseFloat(r[chargesKey]) || 0), l: d3.max(matches, r => parseFloat(r[totalKey]) || 0) };
+                         c: d3.sum(matches, r => parseFloat(r[chargesKey]) || 0), l: d3.max(matches, r => parseFloat(r[totalKey]) || 0),
+                         seriesKey: isSingleYear ? lbl : activeVal };
             });
 
-            const x = d3.scaleBand().domain(selectedJuris).range([0, width]).padding(0.2);
+            const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
 
             g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
             g.selectAll('.grid-lines path').style('display', 'none');
 
-            g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
+            const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
+            if (!isSingleYear) xAxis.selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
+
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer').attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.label))
+            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
+                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
-                    if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
-                    tooltip.style('opacity', 1).html(`<strong>${d.label}</strong>: ${d.value.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.label));
+                    if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
+                    tooltip.style('opacity', 1).html(`<strong>${d.seriesKey}</strong> (${isSingleYear ? activeVal : d.label})<br>Rate (Per 10k): ${d.value.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`)
+                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.seriesKey); });
+            
+            g.selectAll('text.bar-label').data(dataPoints).enter().append('text').attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
+                .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
+                .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
+                .text(d => d.value.toFixed(2));
+
+            if (!isSingleYear) drawLegend();
+
         } else {
             const x = d3.scalePoint().domain(selectedYears).range([0, width]).padding(0.5);
             let maxVal = 0;
@@ -101,26 +139,19 @@ function renderNormalizedChart(canvasId, dataset) {
             const line = d3.line().x(d => x(d.year)).y(d => y(d.val));
             const lines = g.selectAll('.line-group').data(lineData).enter().append('g').attr('class', 'line-group').style('transition', 'opacity 0.2s');
 
-            lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 20).style('cursor', 'pointer').on('click', (event, d) => toggleHighlight(d.juris));
+            lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 20).style('cursor', 'pointer').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('pointer-events', 'none');
             
             lines.selectAll('.dot').data(d => d.values.map(v => ({...v, juris: d.juris}))).enter().append('path').attr('class', 'dot').attr('d', d => d3.symbol().type(shapeScale(d.juris)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.juris)).style('stroke-width', 2).style('cursor', 'pointer')
                 .on('mousemove', function(event, d) {
                     d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(150)());
                     tooltip.style('opacity', 1).html(`<strong>${d.juris}</strong> (${d.year})<br>Rate (Per 10k): ${d.val.toFixed(2)}<br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}`).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function(event, d) { d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(50)()); tooltip.style('opacity', 0); }).on('click', (event, d) => toggleHighlight(d.juris));
+                }).on('mouseout', function(event, d) { d3.select(this).attr('d', d3.symbol().type(shapeScale(d.juris)).size(50)()); tooltip.style('opacity', 0); })
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
 
-            const itemHeight = 22;
-            const legendHeight = selectedJuris.length * itemHeight;
-            const startY = Math.max(0, (height - legendHeight) / 2);
-            const legend = g.append('g').attr('transform', `translate(${width + 15}, ${startY})`);
-
-            selectedJuris.forEach((juris, i) => {
-                const row = legend.append('g').datum(juris).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => toggleHighlight(d));
-                row.append('path').attr('d', d3.symbol().type(shapeScale(juris)).size(50)()).attr('transform', 'translate(6,6)').attr('fill', '#fff').attr('stroke', colorScale(juris)).attr('stroke-width', 2);
-                row.append('text').attr('x', 15).attr('y', 10).text(juris).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
-            });
+            drawLegend(); 
         }
+
         applyHighlight(); 
     }
     const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
