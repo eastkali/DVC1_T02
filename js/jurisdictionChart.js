@@ -56,9 +56,9 @@ function renderJurisdictionChart(canvasId, dataset) {
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
-        const margin = isSingleYear 
+        const margin = useBarChart 
             ? { top: 55, right: 20, bottom: 45, left: 60 } 
-            : { top: (useBarChart ? 55 : 20), right: 60, bottom: 45, left: 60 };
+            : { top: 20, right: 80, bottom: 45, left: 60 };
 
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
@@ -115,58 +115,29 @@ function renderJurisdictionChart(canvasId, dataset) {
             g.append('g').call(d3.axisLeft(y));
 
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
-                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey));
-
-            g.append('rect')
-                .attr('width', width)
-                .attr('height', height)
-                .attr('fill', 'transparent')
-                .style('pointer-events', 'all')
-                .on('mousemove', function(event) {
-                    const pointer = d3.pointer(event, this); 
-                    const mouseX = pointer[0];
-
-                    const domain = x.domain();
-                    const range = x.range();
-                    const scaleWidth = range[1] - range[0];
-                    
-                    let index = Math.floor((mouseX / scaleWidth) * domain.length);
-                    index = Math.max(0, Math.min(index, domain.length - 1)); 
-                    
-                    const closestCategory = domain[index];
-                    const d = dataPoints.find(item => item.label === closestCategory);
-
-                    if (!d) return;
-
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
-                        return bar.label === closestCategory ? 0.8 : 1;
-                    });    
-                    
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
+                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey))
+                .on('mousemove', function(event, d) {
+                    if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
                     
                     let html = `
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
-                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">${d.seriesKey} (${isSingleYear ? activeVal : d.label})</div>
+                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                <svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${colorScale(d.seriesKey)}"></rect></svg>
+                                <span>${d.seriesKey} (${isSingleYear ? activeVal : d.label})</span>
+                            </div>
+                        </div>
                         <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { 
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
-                        return 1;
-                    });
-                    applyHighlight(); 
-                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
-                })
+                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.seriesKey); });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text').attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
                 .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
                 .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
                 .text(d => d.value.toLocaleString());
-
-            if (!isSingleYear) drawLegend();
 
         } else {
             const x = d3.scalePoint().domain(selectedYears).range([0, width]);
@@ -205,8 +176,6 @@ function renderJurisdictionChart(canvasId, dataset) {
                         return d3.symbol().type(shapeScale(dotData.juris)).size(50)();
                     });
 
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
-
                     const yearData = lineData.map(ld => {
                         const pt = ld.values.find(v => v.year === d.year);
                         return { juris: ld.juris, val: pt ? pt.val : 0 };
@@ -235,8 +204,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                         </div>`;
                     });
 
-                    tooltip.style('opacity', 1).html(html)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
                 }).on('mouseout', function(event, d) { 
                     g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
                     tooltip.style('opacity', 0); 

@@ -19,8 +19,8 @@ function renderDetectionChart(canvasId, dataset) {
 
     const selectedMethods = [...new Set(dataset.map(r => r[methodKey]?.toString().trim()).filter(Boolean))].sort();
     const allMethods = [...new Set(window.rawDatasets.main.map(r => r[methodKey]?.toString().trim()).filter(Boolean))].sort();
-    
     const selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
+
     const isSingleYear = selectedYears.length === 1; 
     const isSingleMethod = selectedMethods.length === 1; 
     
@@ -76,7 +76,7 @@ function renderDetectionChart(canvasId, dataset) {
             else if (type === 3) pat.append('path').attr('d', 'M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4').attr('stroke', pc).attr('stroke-width', 1.5);
             else if (type === 4) pat.append('path').attr('d', 'M-2,6 l4,4 M0,0 l8,8 M6,-2 l4,4').attr('stroke', pc).attr('stroke-width', 1.5);
             else if (type === 5) pat.append('path').attr('d', 'M4,0 l0,8 M0,4 l8,0').attr('stroke', pc).attr('stroke-width', 1.5);
-            else if (type === 6) pat.append('path').attr('d', 'M-2,2 l4,-4 M0,8 l8,-8 M6,10 l4,-4 M-2,6 l4,4 M0,0 l8,8 M6,-2 l4,4').attr('stroke', pc).attr('stroke-width', 1);
+            else if (type === 6) pat.append('path').attr('d', 'M-2,2 l6,-6 M0,10 l10,-10 M8,12 l6,-6 M-2,8 l6,6 M0,0 l10,10 M8,-2 l6,6').attr('stroke', pc).attr('stroke-width', 1);
             else if (type === 7) pat.append('circle').attr('cx', 4).attr('cy', 4).attr('r', 2.5).attr('fill', 'none').attr('stroke', pc).attr('stroke-width', 1);
         });
 
@@ -153,7 +153,9 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('d', arc).attr('fill', d => getPatternFill(d.data.seriesKey))
                 .style('stroke', '#fff').style('stroke-width', 2)
                 .on('mousemove', function(event, d) {
-                    if (!activeSeries || activeSeries === d.data.seriesKey) d3.select(this).attr('d', arcHover).style('opacity', 0.85);
+                    if (!activeSeries || activeSeries === d.data.seriesKey) {
+                        d3.select(this).attr('d', arcHover).style('opacity', 0.85);
+                    }
                     
                     const pct = ((d.data.value / d3.sum(dataPoints, dp => dp.value)) * 100).toFixed(1);
                     
@@ -198,7 +200,7 @@ function renderDetectionChart(canvasId, dataset) {
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
-                .attr('fill', d => getPatternFill(d.seriesKey))
+                .attr('fill', d => colorScale(d.seriesKey))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
                     
@@ -206,7 +208,7 @@ function renderDetectionChart(canvasId, dataset) {
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                ${getTooltipIcon(d.seriesKey)}
+                                <svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${colorScale(d.seriesKey)}"></rect></svg>
                                 <span>${d.seriesKey} (${d.label})</span>
                             </div>
                         </div>

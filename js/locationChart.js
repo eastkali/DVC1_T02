@@ -152,7 +152,7 @@ function renderLocationChart(canvasId, dataset) {
 
             selectedLocations.forEach((loc, i) => {
                 const row = legend.append('g').datum(loc).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d); });
-                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', getPatternFill(loc)).attr('y', -5).attr('rx', 2);
+                row.append('rect').attr('width', 10).attr('height', 10).attr('fill', useBarChart ? colorScale(loc) : getPatternFill(loc)).attr('y', -5).attr('rx', 2);
                 const lines = formatLegendLabel(loc);
                 lines.forEach((lineStr, lineIdx) => {
                     row.append('text').attr('x', 15).attr('y', 4 + (lineIdx * 12)).text(lineStr).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
@@ -196,7 +196,7 @@ function renderLocationChart(canvasId, dataset) {
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
-                .attr('fill', d => getPatternFill(isSingleYear ? d.label : activeVal))
+                .attr('fill', d => colorScale(isSingleYear ? d.label : activeVal))
                 .on('mousemove', function(event, d) {
                     if (!activeSeries || activeSeries === d.label) d3.select(this).style('opacity', 0.8);
                     
@@ -204,7 +204,7 @@ function renderLocationChart(canvasId, dataset) {
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                ${getTooltipIcon(isSingleYear ? d.label : activeVal)}
+                                <svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${colorScale(isSingleYear ? d.label : activeVal)}"></rect></svg>
                                 <span>${isSingleYear ? d.label : activeVal} (${isSingleYear ? activeVal : d.label})</span>
                             </div>
                         </div>
@@ -249,7 +249,6 @@ function renderLocationChart(canvasId, dataset) {
 
             const layers = g.selectAll('.layer').data(stack).enter().append('g')
                 .attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => getPatternFill(d.key));
-
             layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect')
                 .style('cursor', 'pointer')
                 .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
