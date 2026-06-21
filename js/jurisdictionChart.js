@@ -22,8 +22,34 @@ function renderJurisdictionChart(canvasId, dataset) {
 
     const getValue = (row) => parseFloat(row[Object.keys(row).find(key => key.toLowerCase().includes('offense') || key.toLowerCase().includes('count') || key.toLowerCase().includes('total'))]) || 0;
 
+    const customX = {
+        draw(context, size) {
+            const r = Math.sqrt(size) * 0.6;
+            const w = r * 0.3;
+            context.moveTo(-r, -r+w); context.lineTo(-r+w, -r); context.lineTo(0, -w);
+            context.lineTo(r-w, -r); context.lineTo(r, -r+w); context.lineTo(w, 0);
+            context.lineTo(r, r-w); context.lineTo(r-w, r); context.lineTo(0, w);
+            context.lineTo(-r+w, r); context.lineTo(-r, r-w); context.lineTo(-w, 0);
+            context.closePath();
+        }
+    };
+
+    const customHexagon = {
+        draw(context, size) {
+            const r = Math.sqrt(size) * 0.65;
+            const h = r * 0.866;
+            context.moveTo(r, 0);
+            context.lineTo(r/2, h);
+            context.lineTo(-r/2, h);
+            context.lineTo(-r, 0);
+            context.lineTo(-r/2, -h);
+            context.lineTo(r/2, -h);
+            context.closePath();
+        }
+    };
+
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
-    const targetShapes = [d3.symbolCircle, d3.symbolSquare, d3.symbolStar, d3.symbolTriangle, d3.symbolDiamond, d3.symbolCross, d3.symbolWye, d3.symbolCircle];
+    const targetShapes = [d3.symbolCircle, d3.symbolSquare, d3.symbolStar, d3.symbolTriangle, d3.symbolDiamond, customX, d3.symbolCross, customHexagon];
     const colorScale = d3.scaleOrdinal().domain(allJuris).range(targetColors);
     const shapeScale = d3.scaleOrdinal().domain(allJuris).range(targetShapes);
 
@@ -44,7 +70,8 @@ function renderJurisdictionChart(canvasId, dataset) {
         .style('backdrop-filter', 'blur(4px)')
         .style('overflow', 'visible')
         .style('opacity', 0)
-        .style('z-index', 9999);
+        .style('z-index', 9999)
+        .style('transform', 'translateY(-50%)');
 
     let activeSeries = null;
     const isSingleYear = selectedYears.length === 1;
@@ -148,20 +175,30 @@ function renderJurisdictionChart(canvasId, dataset) {
                         <div style="position: absolute; top: 50%; left: -6px; transform: translateY(-50%); width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <svg width="14" height="14" style="flex-shrink: 0; overflow: visible;">
-                                    <path d="${d3.symbol().type(shapeScale(d.seriesKey)).size(40)()}" transform="translate(7,7)" fill="#fff" stroke="${colorScale(d.seriesKey)}" stroke-width="2"></path>
-                                </svg>
+                                <svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${colorScale(d.seriesKey)}"></rect></svg>
                                 <span>${d.seriesKey} (${isSingleYear ? activeVal : d.label})</span>
                             </div>
                         </div>
                         <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
-                    tooltip.style('opacity', 1).html(html);
-                    const tipHeight = tooltip.node().offsetHeight;
-                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', event.pageY + 'px');
                 }).on('mouseout', function() { 
                     g.selectAll('rect.bar-item').style('opacity', 1);
                     tooltip.style('opacity', 0); 
+                }).on('click', function(event) { 
+                    const pointer = d3.pointer(event, this); 
+                    const mouseX = pointer[0];
+                    const domain = x.domain();
+                    const range = x.range();
+                    const scaleWidth = range[1] - range[0];
+                    let index = Math.floor((mouseX / scaleWidth) * domain.length);
+                    index = Math.max(0, Math.min(index, domain.length - 1)); 
+                    const closestCategory = domain[index];
+                    const d = dataPoints.find(item => item.label === closestCategory);
+                    if (d) {
+                        event.stopPropagation();
+                        toggleHighlight(d.seriesKey);
+                    }
                 });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text').attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
@@ -235,9 +272,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                         </div>`;
                     });
 
-                    tooltip.style('opacity', 1).html(html);
-                    const tipHeight = tooltip.node().offsetHeight;
-                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', event.pageY + 'px');
                 }).on('mouseout', function(event, d) { 
                     g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
                     tooltip.style('opacity', 0); 
