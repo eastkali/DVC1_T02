@@ -20,7 +20,6 @@ function renderLocationChart(canvasId, dataset) {
     let selectedLocations = [...new Set(dataset.map(r => r[locKey]?.toString().trim()).filter(Boolean))];
     
     const allLocations = [...new Set(window.rawDatasets.main.map(r => r[locKey]?.toString().trim()).filter(Boolean))].sort();
-
     const getValue = (row) => parseFloat(row[Object.keys(row).find(key => key.toLowerCase().includes('offenses'))]) || 0;
 
     const locTotals = {};
@@ -211,7 +210,11 @@ function renderLocationChart(canvasId, dataset) {
                         <div style="font-size: 11px;">Offenses: <strong>${isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                }).on('mouseout', function(event, d) { 
+                    d3.select(this).style('opacity', null);
+                    applyHighlight(); 
+                    tooltip.style('opacity', 0); 
+                })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(isSingleYear ? d.label : activeVal); });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
@@ -249,10 +252,13 @@ function renderLocationChart(canvasId, dataset) {
 
             const layers = g.selectAll('.layer').data(stack).enter().append('g')
                 .attr('class', 'layer').style('transition', 'opacity 0.2s').attr('fill', d => getPatternFill(d.key));
+
             layers.selectAll('rect').data(d => d.map(item => ({...item, key: d.key}))).enter().append('rect')
                 .style('cursor', 'pointer')
-                .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => y(d[0]) - y(d[1])).attr('width', x.bandwidth())
+                .style('transition', 'opacity 0.2s')
+                .attr('x', d => x(d.data.year)).attr('y', d => y(d[1])).attr('height', d => Math.max(0, y(d[0]) - y(d[1]))).attr('width', x.bandwidth())
                 .on('mousemove', function(event, d) {
+                    
                     if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
 
                     const yearTotalRaw = selectedLocations.reduce((sum, loc) => sum + (d.data[`${loc}_raw`] || 0), 0);
@@ -282,7 +288,11 @@ function renderLocationChart(canvasId, dataset) {
 
                     tooltip.style('opacity', 1).html(html)
                         .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
+                }).on('mouseout', function(event, d) { 
+                    d3.select(this).style('opacity', null);
+                    applyHighlight(); 
+                    tooltip.style('opacity', 0); 
+                })
                 .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
                 
             drawLegend();
