@@ -200,9 +200,35 @@ function renderDetectionChart(canvasId, dataset) {
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
-                .attr('fill', d => colorScale(d.seriesKey))
-                .on('mousemove', function(event, d) {
-                    if (!activeSeries || activeSeries === d.seriesKey) d3.select(this).style('opacity', 0.8);
+                .attr('fill', d => colorScale(d.seriesKey));
+            
+            g.append('rect')
+                .attr('width', width)
+                .attr('height', height)
+                .attr('fill', 'transparent')
+                .style('pointer-events', 'all')
+                .on('mousemove', function(event) {
+                    const pointer = d3.pointer(event, this); 
+                    const mouseX = pointer[0];
+
+                    const domain = x.domain();
+                    const range = x.range();
+                    const scaleWidth = range[1] - range[0];
+                    
+                    let index = Math.floor((mouseX / scaleWidth) * domain.length);
+                    index = Math.max(0, Math.min(index, domain.length - 1)); 
+                    
+                    const closestCategory = domain[index];
+                    const d = dataPoints.find(item => item.label === closestCategory);
+
+                    if (!d) return;
+
+                    g.selectAll('rect.bar-item').style('opacity', bar => {
+                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
+                        return bar.label === closestCategory ? 0.8 : 1;
+                    });
+
+                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
                     
                     let html = `
                         <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
@@ -215,8 +241,14 @@ function renderDetectionChart(canvasId, dataset) {
                         <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { applyHighlight(); tooltip.style('opacity', 0); })
-                .on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.seriesKey); });
+                }).on('mouseout', function() { 
+                    g.selectAll('rect.bar-item').style('opacity', bar => {
+                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
+                        return 1;
+                    });
+                    applyHighlight(); 
+                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
+                })
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
                 .attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
@@ -246,6 +278,8 @@ function renderDetectionChart(canvasId, dataset) {
             g.append('g').call(d3.axisLeft(y));
 
             const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
+
+            const dataDots = g.selectAll('.data-dot').data(stack.flatMap(d => d.map(p => ({...p, key: d.key})))).enter().append('circle').attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none').attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3).attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
 
             areas.append('path')
                 .attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
