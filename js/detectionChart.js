@@ -211,60 +211,60 @@ function renderDetectionChart(canvasId, dataset) {
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
             g.append('g').call(d3.axisLeft(y));
 
-            const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
+            const areas = g.selectAll('.area-path').data(stack).enter().append('path').attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer') .style('pointer-events', 'all').attr('d', area).attr('fill', d => colorScale(d.key)).style('stroke', d => colorScale(d.key)).style('stroke-width', 1.5).style('stroke-linejoin', 'round');
 
-            areas.append('path')
-                .attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
-                .attr('d', area).attr('fill', d => colorScale(d.key)).style('stroke', d => colorScale(d.key)).style('stroke-width', 1.5).style('stroke-linejoin', 'round')
-                .on('mousemove', function(event, d) {
-                    if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
-                    const pointer = d3.pointer(event, this); 
-                    const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); 
-                    
-                    g.selectAll('.data-dot')
-                     .attr('r', dotData => {
-                         if (dotData.data.year === closestYear) {
-                             return dotData.key === d.key ? 7 : 5;
-                         }
-                         return 3; 
-                     })
-                     .style('stroke-width', dotData => dotData.data.year === closestYear ? 2 : 1.5);
+            const dataDots = g.selectAll('.data-dot').data(stack.flatMap(d => d.map(p => ({...p, key: d.key})))).enter().append('circle').attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none').attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3).attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
 
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
+            
+            areas.on('mousemove', function(event, d) {
+                if (!activeSeries || activeSeries === d.key) d3.select(this).style('opacity', 0.8);
+                const pointer = d3.pointer(event, this); 
+                const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); 
+                
+                g.selectAll('.data-dot')
+                    .attr('r', dotData => {
+                        if (dotData.data.year === closestYear) {
+                            return dotData.key === d.key ? 7 : 5;
+                        }
+                        return 3; 
+                    })
+                    .style('stroke-width', dotData => dotData.data.year === closestYear ? 2 : 1.5);
 
-                    const yearData = stackData.find(row => row.year === closestYear);
-                    const yearTotalRaw = selectedMethods.reduce((sum, method) => sum + (yearData[method] || 0), 0);
+                tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
 
-                    const sortedData = selectedMethods
-                        .map(method => ({ loc: method, val: yearData[method] }))
-                        .filter(item => item.val !== undefined)
-                        .sort((a, b) => b.val - a.val);
+                const yearData = stackData.find(row => row.year === closestYear);
+                const yearTotalRaw = selectedMethods.reduce((sum, method) => sum + (yearData[method] || 0), 0);
 
-                    let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
-                        <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
-                            ${closestYear} Total: ${yearTotalRaw.toLocaleString()}
+                const sortedData = selectedMethods
+                    .map(method => ({ loc: method, val: yearData[method] }))
+                    .filter(item => item.val !== undefined)
+                    .sort((a, b) => b.val - a.val);
+
+                let html = `
+                    <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                    <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
+                        ${closestYear} Total: ${yearTotalRaw.toLocaleString()}
+                    </div>
+                `;
+                
+                sortedData.forEach(item => {
+                    html += `
+                    <div style="display:flex; justify-content: space-between; align-items:center; gap:20px; margin-top:4px; font-size: 11px;">
+                        <div style="display:flex; align-items:center; gap:6px;">
+                            <svg width="10" height="10" style="flex-shrink: 0;"><rect width="10" height="10" rx="2" fill="${colorScale(item.loc)}"></rect></svg>
+                            <span>${item.loc}</span>
                         </div>
-                    `;
-                    
-                    sortedData.forEach(item => {
-                        html += `
-                        <div style="display:flex; justify-content: space-between; align-items:center; gap:20px; margin-top:4px; font-size: 11px;">
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                <svg width="10" height="10" style="flex-shrink: 0;"><rect width="10" height="10" rx="2" fill="${colorScale(item.loc)}"></rect></svg>
-                                <span>${item.loc}</span>
-                            </div>
-                            <strong>${item.val.toLocaleString()}</strong>
-                        </div>`;
-                    });
+                        <strong>${item.val.toLocaleString()}</strong>
+                    </div>`;
+                });
 
-                    tooltip.style('opacity', 1).html(html)
-                        .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
-                }).on('mouseout', function() { 
-                    applyHighlight(); 
-                    g.selectAll('.data-dot').attr('r', 3).style('stroke-width', 1.5);
-                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
-                }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
+                tooltip.style('opacity', 1).html(html)
+                    .style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+            }).on('mouseout', function() { 
+                applyHighlight(); 
+                g.selectAll('.data-dot').attr('r', 3).style('stroke-width', 1.5);
+                tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
+            }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.key); });
 
             areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
                 .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
