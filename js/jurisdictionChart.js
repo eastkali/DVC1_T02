@@ -114,9 +114,11 @@ function renderJurisdictionChart(canvasId, dataset) {
 
             g.append('g').call(d3.axisLeft(y));
 
-            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
-                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey));
-            
+            g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
+                .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
+                .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
+                .attr('fill', d => colorScale(d.seriesKey));
+
             g.append('rect')
                 .attr('width', width)
                 .attr('height', height)
@@ -139,31 +141,28 @@ function renderJurisdictionChart(canvasId, dataset) {
                     if (!d) return;
 
                     g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
                         return bar.label === closestCategory ? 0.8 : 1;
                     });
 
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
-                    
                     let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="position: absolute; top: 50%; left: -6px; transform: translateY(-50%); width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
-                                <svg width="10" height="10" style="flex-shrink: 0; border-radius: 2px; overflow: hidden;"><rect width="10" height="10" fill="${colorScale(d.seriesKey)}"></rect></svg>
+                                <svg width="14" height="14" style="flex-shrink: 0; overflow: visible;">
+                                    <path d="${d3.symbol().type(shapeScale(d.seriesKey)).size(40)()}" transform="translate(7,7)" fill="#fff" stroke="${colorScale(d.seriesKey)}" stroke-width="2"></path>
+                                </svg>
                                 <span>${d.seriesKey} (${isSingleYear ? activeVal : d.label})</span>
                             </div>
                         </div>
                         <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
-                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html);
+                    const tipHeight = tooltip.node().offsetHeight;
+                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
                 }).on('mouseout', function() { 
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
-                        return 1;
-                    });
-                    applyHighlight(); 
-                    tooltip.style('opacity', 0).style('background', 'rgba(255,255,255,0.95)').style('border', '1px solid #ccc').style('color', '#333').style('backdrop-filter', 'none'); 
-                })
+                    g.selectAll('rect.bar-item').style('opacity', 1);
+                    tooltip.style('opacity', 0); 
+                });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text').attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
@@ -217,7 +216,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                     const yearTotalRaw = sortedData.reduce((sum, item) => sum + item.val, 0);
 
                     let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="position: absolute; top: 50%; left: -6px; transform: translateY(-50%); width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             ${d.year} Total: ${yearTotalRaw.toLocaleString()}
                         </div>
@@ -236,7 +235,9 @@ function renderJurisdictionChart(canvasId, dataset) {
                         </div>`;
                     });
 
-                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html);
+                    const tipHeight = tooltip.node().offsetHeight;
+                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
                 }).on('mouseout', function(event, d) { 
                     g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
                     tooltip.style('opacity', 0); 

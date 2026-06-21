@@ -163,16 +163,18 @@ function renderDetectionChart(canvasId, dataset) {
                     const pct = ((d.data.value / totalVal) * 100).toFixed(1);
                     
                     let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="position: absolute; top: 50%; left: -6px; margin-top: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 ${getTooltipIcon(d.data.seriesKey)}
                                 <span>${d.data.label} (${selectedYears[0]})</span>
                             </div>
                         </div>
-                        <div style="font-size: 11px;">Offences: <strong>${d.data.value.toLocaleString()} (${pct}%)</strong><br>• Fines: ${d.data.f.toLocaleString()}<br>• Arrests: ${d.data.a.toLocaleString()}<br>• Charges: ${d.data.c.toLocaleString()}</div>
+                        <div style="font-size: 11px;">Offenses: <strong>${d.data.value.toLocaleString()} (${pct}%)</strong><br>• Fines: ${d.data.f.toLocaleString()}<br>• Arrests: ${d.data.a.toLocaleString()}<br>• Charges: ${d.data.c.toLocaleString()}</div>
                     `;
-                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html);
+                    const tipHeight = tooltip.node().offsetHeight;
+                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
                 }).on('mouseout', function(event, d) {
                     d3.select(this).style('opacity', null); 
                     applyHighlight(); 
@@ -258,44 +260,25 @@ function renderDetectionChart(canvasId, dataset) {
                     if (!d) return;
 
                     g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
                         return bar.label === closestCategory ? 0.8 : 1;
                     });
 
-                    tooltip.style('background', 'rgba(15, 23, 42, 0.8)').style('border', 'none').style('color', '#fff').style('backdrop-filter', 'blur(4px)').style('overflow', 'visible');
-                    
                     let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="position: absolute; top: 50%; left: -6px; margin-top: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             <div style="display:flex; align-items:center; gap:6px;">
                                 <svg width="14" height="14" style="flex-shrink: 0; border-radius: 3px; overflow: hidden;"><rect width="14" height="14" fill="${colorScale(d.seriesKey)}"></rect></svg>
                                 <span>${d.seriesKey} (${d.label})</span>
                             </div>
                         </div>
-                        <div style="font-size: 11px;">Offences: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
+                        <div style="font-size: 11px;">Offenses: <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}</div>
                     `;
-                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html);
+                    const tipHeight = tooltip.node().offsetHeight;
+                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
                 }).on('mouseout', function() { 
-                    g.selectAll('rect.bar-item').style('opacity', bar => {
-                        if (activeSeries && bar.seriesKey !== activeSeries) return 0.1;
-                        return 1;
-                    });
-                    applyHighlight(); 
+                    g.selectAll('rect.bar-item').style('opacity', 1);
                     tooltip.style('opacity', 0); 
-                }).on('click', function(event) { 
-                    const pointer = d3.pointer(event, this); 
-                    const mouseX = pointer[0];
-                    const domain = x.domain();
-                    const range = x.range();
-                    const scaleWidth = range[1] - range[0];
-                    let index = Math.floor((mouseX / scaleWidth) * domain.length);
-                    index = Math.max(0, Math.min(index, domain.length - 1)); 
-                    const closestCategory = domain[index];
-                    const d = dataPoints.find(item => item.label === closestCategory);
-                    if (d) {
-                        event.stopPropagation();
-                        toggleHighlight(d.seriesKey);
-                    }
                 });
             
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
@@ -356,7 +339,7 @@ function renderDetectionChart(canvasId, dataset) {
                         .sort((a, b) => b.val - a.val);
 
                     let html = `
-                        <div style="position: absolute; top: 12px; left: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
+                        <div style="position: absolute; top: 50%; left: -6px; margin-top: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
                             ${closestYear} Total: ${yearTotalRaw.toLocaleString()}
                         </div>
@@ -373,7 +356,9 @@ function renderDetectionChart(canvasId, dataset) {
                         </div>`;
                     });
 
-                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - 15) + 'px');
+                    tooltip.style('opacity', 1).html(html);
+                    const tipHeight = tooltip.node().offsetHeight;
+                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
                 }).on('mouseout', function(event, d) { 
                     d3.select(this).style('opacity', null); 
                     applyHighlight(); 
