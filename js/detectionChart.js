@@ -146,7 +146,7 @@ function renderDetectionChart(canvasId, dataset) {
 
             const centerX = width / 2;
             const centerY = height / 2;
-            const radius = Math.min(width, height) / 2;
+            const radius = Math.min(width, height) / 2.2;
             
             const gPie = g.append("g").attr("transform", `translate(${centerX},${centerY})`);
 
@@ -196,7 +196,7 @@ function renderDetectionChart(canvasId, dataset) {
                     const posA = arc.centroid(d);
                     const posB = outerArc.centroid(d);
                     const posC = [...posB];
-                    posC[0] = radius * 0.5 * (midAngle(d) < Math.PI ? 1 : -1);
+                    posC[0] = radius * 0.8 * (midAngle(d) < Math.PI ? 1 : -1);
                     return [posA, posB, posC];
                 })
                 .style('fill', 'none').style('stroke', '#94a3b8').style('stroke-width', 1);
@@ -206,7 +206,7 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('class', 'slice-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('transform', d => {
                     const pos = outerArc.centroid(d);
-                    pos[0] = radius * 0.6 * (midAngle(d) < Math.PI ? 1 : -1);
+                    pos[0] = radius * 0.85 * (midAngle(d) < Math.PI ? 1 : -1);
                     return `translate(${pos})`;
                 })
                 .style('text-anchor', d => midAngle(d) < Math.PI ? 'start' : 'end')
@@ -323,7 +323,11 @@ function renderDetectionChart(canvasId, dataset) {
 
             const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
 
-            const dataDots = g.selectAll('.data-dot').data(stack.flatMap(d => d.map(p => ({...p, key: d.key})))).enter().append('circle').attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none').attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3).attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
+            // Data dots rendered underneath the paths
+            areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
+                .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
+                .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3) 
+                .attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
 
             areas.append('path')
                 .attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
