@@ -50,12 +50,15 @@ function renderAgeGroupChart(canvasId, dataset) {
 
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
     const targetShapes = [d3.symbolCircle, d3.symbolSquare, d3.symbolStar, d3.symbolTriangle, d3.symbolDiamond, customX, d3.symbolCross, customHexagon];
+
+    // Create ordinal scales for colors and accessibility shapes
     const colorScale = d3.scaleOrdinal().domain(allAges).range(targetColors);
     const shapeScale = d3.scaleOrdinal().domain(allAges).range(targetShapes);
 
     const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
     const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
+    // Attach dynamic tooltip to body
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute')
         .style('background', 'rgba(15, 23, 42, 0.8)')
@@ -83,6 +86,7 @@ function renderAgeGroupChart(canvasId, dataset) {
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
+        // Dynamic margins based on chart type
         const margin = useBarChart 
             ? { top: 55, right: 20, bottom: isSingleYear ? 70 : 45, left: 60 } 
             : { top: 20, right: 85, bottom: 45, left: 60 };
@@ -90,6 +94,7 @@ function renderAgeGroupChart(canvasId, dataset) {
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
+        // Handle click-based dimming isolation
         function toggleHighlight(key) { activeSeries = activeSeries === key ? null : key; applyHighlight(); }
 
         function applyHighlight() {
@@ -111,12 +116,14 @@ function renderAgeGroupChart(canvasId, dataset) {
 
             selectedAges.forEach((age, i) => {
                 const row = legend.append('g').datum(age).attr('class', 'legend-item').attr('transform', `translate(0, ${i * itemHeight})`).style('cursor', 'pointer').style('transition', 'opacity 0.2s').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d); });
+                // Uses assigned shape rather than flat color rects
                 row.append('path').attr('d', d3.symbol().type(shapeScale(age)).size(50)()).attr('transform', 'translate(6,6)').attr('fill', '#fff').attr('stroke', colorScale(age)).attr('stroke-width', 2);
                 row.append('text').attr('x', 15).attr('y', 10).text(age).style('font-size', '11px').style('fill', '#333').style('font-family', 'sans-serif');
             });
         };
 
         if (useBarChart) {
+            // --- SINGLE YEAR/CATEGORY: BAR CHART ---
             const labels = isSingleYear ? selectedAges : selectedYears;
             const activeKey = isSingleYear ? yearKey : ageKey;
             const activeVal = isSingleYear ? selectedYears[0] : selectedAges[0];
@@ -145,6 +152,7 @@ function renderAgeGroupChart(canvasId, dataset) {
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect').attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value)).attr('fill', d => colorScale(d.seriesKey));
 
+            // Transparent overlay allowing users to hover anywhere in the column
             g.append('rect')
                 .attr('width', width)
                 .attr('height', height)
@@ -211,6 +219,7 @@ function renderAgeGroupChart(canvasId, dataset) {
                 .text(d => d.value.toLocaleString());
 
         } else {
+            // --- MULTI-YEAR: LINE CHART ---
             const x = d3.scalePoint().domain(selectedYears).range([0, width]);
             let maxVal = 0;
             const lineData = selectedAges.map(age => {
@@ -233,13 +242,16 @@ function renderAgeGroupChart(canvasId, dataset) {
             const line = d3.line().x(d => x(d.year)).y(d => y(d.val));
             const lines = g.selectAll('.line-group').data(lineData).enter().append('g').attr('class', 'line-group').style('transition', 'opacity 0.2s');
 
+            // Invisible thick line for easy hovering
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', 'transparent').style('stroke-width', 20).style('cursor', 'pointer').on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.age); });
+            // Visible path line
             lines.append('path').attr('d', d => line(d.values)).style('fill', 'none').style('stroke', d => colorScale(d.age)).style('stroke-width', 2).style('pointer-events', 'none');
             
             lines.selectAll('.dot').data(d => d.values.map(v => ({...v, age: d.age}))).enter().append('path').attr('class', 'dot').style('transition', 'all 0.15s ease-out')
                 .attr('d', d => d3.symbol().type(shapeScale(d.age)).size(50)()).attr('transform', d => `translate(${x(d.year)},${y(d.val)})`).style('fill', '#fff').style('stroke', d => colorScale(d.age)).style('stroke-width', 2).style('cursor', 'pointer')
                 .on('mousemove', function(event, d) {
                     
+                    // Enlarge points dynamically
                     g.selectAll('.dot').attr('d', dotData => {
                         if (dotData.year === d.year) {
                             return d3.symbol().type(shapeScale(dotData.age)).size(dotData.age === d.age ? 200 : 100)();

@@ -9,6 +9,7 @@ function renderNormalizedChart(canvasId, dataset) {
     if (container.node()._d3Observer) container.node()._d3Observer.disconnect();
     container.selectAll('.d3-svg-wrapper').remove();
 
+    // Map unique normalized headers
     const firstRow = dataset[0] || {};
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const jurisKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'jurisdiction') || 'JURISDICTION';
@@ -22,6 +23,7 @@ function renderNormalizedChart(canvasId, dataset) {
     const allJuris = [...new Set(window.rawDatasets.main.map(r => r[jurisKey]?.toString().trim()).filter(Boolean))].sort();
     const selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort((a, b) => parseInt(a) - parseInt(b));
 
+    // --- ACCESSIBILITY CONFIGURATION ---
     const customX = {
         draw(context, size) {
             const r = Math.sqrt(size) * 0.6;
@@ -117,10 +119,12 @@ function renderNormalizedChart(canvasId, dataset) {
         };
 
         if (useBarChart) {
+            // --- SINGLE YEAR/CATEGORY: BAR CHART ---
             const labels = isSingleYear ? selectedJuris : selectedYears;
             const activeKey = isSingleYear ? yearKey : jurisKey;
             const activeVal = isSingleYear ? selectedYears[0] : selectedJuris[0];
 
+            // For normalized rates, we use d3.mean to get the average rate across filters
             const dataPoints = labels.map(lbl => {
                 const matches = dataset.filter(r => r[activeKey]?.toString().trim() === activeVal && r[isSingleYear ? jurisKey : yearKey]?.toString().trim() === lbl);
                 return { label: lbl, value: d3.mean(matches, r => parseFloat(r[normKey]) || 0) || 0,
@@ -207,6 +211,7 @@ function renderNormalizedChart(canvasId, dataset) {
                 .text(d => d.value.toFixed(2));
 
         } else {
+            // --- MULTI-YEAR: LINE CHART ---
             const x = d3.scalePoint().domain(selectedYears).range([0, width]);
             let maxVal = 0;
             const lineData = selectedJuris.map(juris => {

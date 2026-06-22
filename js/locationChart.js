@@ -4,11 +4,14 @@ function renderLocationChart(canvasId, dataset) {
     if (!canvas) return;
 
     if (typeof Chart !== 'undefined') { let existing = Chart.getChart(canvas); if (existing) existing.destroy(); }
+
+    // Setup D3 container and cleanup previous observers/SVGs
     const container = d3.select(canvas.parentNode);
-    canvas.style.display = 'none';
+    canvas.style.display = 'none'; // Hide default canvas as we are injecting SVG
     if (container.node()._d3Observer) container.node()._d3Observer.disconnect();
     container.selectAll('.d3-svg-wrapper').remove();
 
+    // Dynamically identify data keys to handle slight dataset variations
     const firstRow = dataset[0];
     const yearKey = Object.keys(firstRow).find(k => k.toLowerCase() === 'year') || 'YEAR';
     const locKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('loc')) || 'LOCATION';
@@ -16,29 +19,37 @@ function renderLocationChart(canvasId, dataset) {
     const arrestsKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('arrests'));
     const chargesKey = Object.keys(firstRow).find(k => k.toLowerCase().includes('charges'));
 
+    // Extract unique years and locations for the axes
     let selectedYears = [...new Set(dataset.map(r => r[yearKey]?.toString().trim()).filter(Boolean))].sort();
     let selectedLocations = [...new Set(dataset.map(r => r[locKey]?.toString().trim()).filter(Boolean))];
     
+    // Absolute list of all locations for consistent color/pattern mapping across different filters
     const allLocations = [...new Set(window.rawDatasets.main.map(r => r[locKey]?.toString().trim()).filter(Boolean))].sort();
 
+    // Helper to safely extract offense totals
     const getValue = (row) => parseFloat(row[Object.keys(row).find(key => key.toLowerCase().includes('offenses'))]) || 0;
 
-    const locTotals = {};
+    const locTotals = {}; // Calculate totals per location to determine sorting order
     selectedLocations.forEach(loc => { locTotals[loc] = dataset.filter(r => r[locKey] && r[locKey].toString().trim() === loc).reduce((s, r) => s + getValue(r), 0); });
     
+    // Filter out locations with 0 offenses to prevent legend overflow, then sort ascending for stack base
     selectedLocations = selectedLocations.filter(loc => locTotals[loc] > 0);
     selectedLocations.sort((a, b) => locTotals[b] - locTotals[a]);
 
+    // Calculate yearly totals for percentage calculations
     const yearlyTotals = {};
     selectedYears.forEach(year => { yearlyTotals[year] = dataset.filter(r => r[yearKey] && r[yearKey].toString().trim() === year).reduce((s, r) => s + getValue(r), 0) || 1; });
 
+    // Define color palette and scale mapped to the absolute location list
     const targetColors = ['#E69F00', '#56B4E9', '#009E73', '#F0E442', '#0072B2', '#D55E00', '#CC79A7', '#000000'];
     const colorScale = d3.scaleOrdinal().domain(allLocations).range(targetColors);
 
+    // Determine chart mode based on dataset length
     const isSingleYear = selectedYears.length === 1;
     const isSingleLocation = selectedLocations.length === 1;
     const useBarChart = isSingleYear || isSingleLocation;
 
+    // Update dynamic chart title
     const titleText = (!isSingleYear && isSingleLocation) ? 'Annual Offenses by Location' : 'Annual Offenses by Location (%)';
     if (canvas.id === 'modal-canvas') {
         const modalTitle = document.getElementById('modal-title');
@@ -51,9 +62,11 @@ function renderLocationChart(canvasId, dataset) {
         }
     }
 
+    // Inject SVG wrapper
     const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
     const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
+    // Create a globally shared, HTML tooltip
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute')
         .style('background', 'rgba(15, 23, 42, 0.8)')
@@ -70,7 +83,7 @@ function renderLocationChart(canvasId, dataset) {
         .style('opacity', 0)
         .style('z-index', 9999);
 
-    let activeSeries = null;
+    let activeSeries = null; // Tracks clicked legend item for isolation
 
     const formatLegendLabel = (loc) => {
         if (!loc) return ['Unknown'];
@@ -79,17 +92,20 @@ function renderLocationChart(canvasId, dataset) {
         return [loc];
     };
 
+    // Formats long text labels to wrap gracefully
     function draw() {
         svg.selectAll('*').remove();
         const cw = wrapper.node().clientWidth; const ch = wrapper.node().clientHeight;
         if (cw === 0 || ch === 0) return;
 
+        // --- ACCESSIBILITY PATTERNS ---
         const defs = svg.append('defs');
         const getPatternFill = (cat) => {
             const idx = allLocations.indexOf(cat);
             return idx > -1 ? `url(#pat-${canvasId}-${idx})` : colorScale(cat);
         };
 
+        // Generate SVG <pattern> definitions for distinct textures
         allLocations.forEach((cat, index) => {
             const c = colorScale(cat);
             const pc = c === '#000000' || c === '#0072B2' ? 'rgba(255,255,255,0.6)' : 'rgba(0,0,0,0.4)';
@@ -98,6 +114,7 @@ function renderLocationChart(canvasId, dataset) {
 
             pat.append('rect').attr('width', 8).attr('height', 8).attr('fill', c);
 
+            // Assign distinct shapes (dots, lines, crosses) based on index
             if (type === 0) pat.append('circle').attr('cx', 4).attr('cy', 4).attr('r', 2).attr('fill', pc);
             else if (type === 1) pat.append('path').attr('d', 'M0,4 l8,0').attr('stroke', pc).attr('stroke-width', 2);
             else if (type === 2) pat.append('path').attr('d', 'M4,0 l0,8').attr('stroke', pc).attr('stroke-width', 2);
@@ -108,6 +125,7 @@ function renderLocationChart(canvasId, dataset) {
             else if (type === 7) pat.append('circle').attr('cx', 4).attr('cy', 4).attr('r', 2.5).attr('fill', 'none').attr('stroke', pc).attr('stroke-width', 1);
         });
 
+        // Generates matching HTML SVG patterns for the tooltip icons
         const getTooltipIcon = (cat) => {
             const index = allLocations.indexOf(cat);
             const c = colorScale(cat);
@@ -126,6 +144,7 @@ function renderLocationChart(canvasId, dataset) {
             return `<svg width="14" height="14" style="flex-shrink: 0; border-radius: 3px; overflow: hidden;"><rect width="14" height="14" fill="${c}"></rect>${overlay}</svg>`;
         };
 
+        // Layout Margins
         const margin = isSingleYear 
             ? { top: 55, right: 20, bottom: 45, left: 60 } 
             : { top: (useBarChart ? 55 : 20), right: 140, bottom: 45, left: 60 };
@@ -133,6 +152,7 @@ function renderLocationChart(canvasId, dataset) {
         const width = cw - margin.left - margin.right; const height = ch - margin.top - margin.bottom;
         const g = svg.append('g').attr('transform', `translate(${margin.left},${margin.top})`);
 
+        // Controls click-to-dim isolation logic
         function toggleHighlight(key) { activeSeries = activeSeries === key ? null : key; applyHighlight(); }
 
         function applyHighlight() {
@@ -145,6 +165,7 @@ function renderLocationChart(canvasId, dataset) {
             }
         }
 
+        // --- LEGEND RENDERING ---
         const drawLegend = () => {
             const itemHeight = 32;
             const legendItems = [...selectedLocations].reverse(); 
@@ -164,10 +185,12 @@ function renderLocationChart(canvasId, dataset) {
         };
 
         if (useBarChart) {
+            // --- SINGLE YEAR: STANDARD BAR CHART ---
             const labels = isSingleYear ? [...selectedLocations].reverse() : selectedYears;
             const activeKey = isSingleYear ? yearKey : locKey;
             const activeVal = isSingleYear ? selectedYears[0] : selectedLocations[0];
 
+            // Parse bar data
             const dataPoints = labels.map(lbl => {
                 const matches = dataset.filter(r => r[activeKey]?.toString().trim() === activeVal && r[isSingleYear ? locKey : yearKey]?.toString().trim() === lbl);
                 const sum = matches.reduce((s, r) => s + getValue(r), 0);
@@ -177,12 +200,15 @@ function renderLocationChart(canvasId, dataset) {
                          c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0) };
             });
 
+            // Set up axes
             const x = d3.scaleBand().domain(labels).range([0, width]).padding(0.2);
             const y = d3.scaleLinear().domain([0, d3.max(dataPoints, d => d.value) * 1.1]).nice().range([height, 0]);
 
+            // Draw grid lines
             g.append('g').attr('class', 'grid-lines').call(d3.axisLeft(y).tickSize(-width).tickFormat('').ticks(6)).selectAll('line').style('stroke', '#e2e8f0').style('stroke-dasharray', '3,3');
             g.selectAll('.grid-lines path').style('display', 'none');
 
+            // Draw X Axis
             const xAxis = g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x));
             xAxis.selectAll('.tick text')
                 .attr("transform", "translate(-10,0)rotate(-45)")
@@ -194,13 +220,16 @@ function renderLocationChart(canvasId, dataset) {
                     }
                 });
 
+            // Draw Y Axis
             g.append('g').call(d3.axisLeft(y).tickFormat(d => isSingleYear ? d + '%' : d.toLocaleString()));
 
+            // Draw underlying bars (pointer events disabled to allow overlay interaction)
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
                 .attr('fill', d => colorScale(isSingleYear ? d.label : activeVal));
 
+            // Transparent overlay for smooth column-based hovering
             g.append('rect')
                 .attr('width', width)
                 .attr('height', height)
@@ -214,6 +243,7 @@ function renderLocationChart(canvasId, dataset) {
                     const range = x.range();
                     const scaleWidth = range[1] - range[0];
                     
+                    // Math to find the closest x-axis category
                     let index = Math.floor((mouseX / scaleWidth) * domain.length);
                     index = Math.max(0, Math.min(index, domain.length - 1)); 
                     
@@ -222,10 +252,12 @@ function renderLocationChart(canvasId, dataset) {
 
                     if (!d) return;
 
+                    // Highlight the closest bar
                     g.selectAll('rect.bar-item').style('opacity', bar => {
                         return bar.label === closestCategory ? 0.8 : 1;
                     });
 
+                    // Build and position tooltip
                     let html = `
                         <div style="position: absolute; top: 50%; left: -6px; margin-top: -6px; width: 0; height: 0; border-top: 6px solid transparent; border-bottom: 6px solid transparent; border-right: 6px solid rgba(15, 23, 42, 0.8);"></div>
                         <div style="font-size: 13px; font-weight: bold; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.2); padding-bottom: 4px;">
@@ -244,6 +276,7 @@ function renderLocationChart(canvasId, dataset) {
                     tooltip.style('opacity', 0); 
                 });
             
+            // Draw bar labels
             g.selectAll('text.bar-label').data(dataPoints).enter().append('text')
                 .attr('class', 'bar-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
@@ -252,6 +285,7 @@ function renderLocationChart(canvasId, dataset) {
                 .text(d => isSingleYear ? d.value.toFixed(1) + '%' : d.value.toLocaleString());
 
         } else {
+            // --- MULTI-YEAR: CUSTOM STACKED BAR CHART ---
             const rectsData = [];
             selectedYears.forEach(year => {
                 const yearMatches = dataset.filter(r => r[yearKey] == year);
@@ -276,6 +310,7 @@ function renderLocationChart(canvasId, dataset) {
                     }
                 });
                 
+                // Sort descending so largest is anchored at the bottom of the stack
                 yearSegments.sort((a, b) => b.pct - a.pct);
                 
                 yearSegments.forEach(seg => {
@@ -297,6 +332,7 @@ function renderLocationChart(canvasId, dataset) {
 
             g.append('g').call(d3.axisLeft(y).tickFormat(d => d + '%'));
 
+            // Render individually calculated stacked rects
             g.selectAll('rect.stacked-bar-item').data(rectsData).enter().append('rect')
                 .attr('class', 'stacked-bar-item')
                 .style('cursor', 'pointer')
@@ -341,6 +377,7 @@ function renderLocationChart(canvasId, dataset) {
         }
         applyHighlight();
     }
+    // Attach ResizeObserver to redraw SVG smoothly on container resize
     const ro = new ResizeObserver(() => window.requestAnimationFrame(draw));
     ro.observe(wrapper.node()); container.node()._d3Observer = ro;
 }

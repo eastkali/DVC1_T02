@@ -1,4 +1,4 @@
-window.chartConfigs = [
+window.chartConfigs = [ // Central configuration array ensuring IDs and titles match consistently across modules
     { id: 'method', title: 'Annual Offenses by Detection Method' },
     { id: 'jurisdiction', title: 'Annual Offenses by Jurisdiction' },
     { id: 'location', title: 'Annual Offenses by Location (%)' },
@@ -14,6 +14,7 @@ window.buildDashboardGrid = function() {
     grid.style.gridTemplateColumns = 'none';
     grid.innerHTML = ''; 
 
+    // Generate Top Row HTML (KPIs, Location, Detection Method)
     const topRowHtml = `
         <div class="top-row-grid">
             <div class="chart-card" style="margin: 0; padding: 0; display: flex; flex-direction: column; overflow: hidden; border: 1px solid #e2e8f0; background: #fff; border-radius: 8px; box-shadow: 0 1px 2px rgba(0,0,0,0.02);">
@@ -51,6 +52,7 @@ window.buildDashboardGrid = function() {
         </div>
     `;
 
+    // Generate Bottom Row HTML dynamically from config array (Jurisdiction, Age, Normalized)
     let bottomRowHtml = `<div class="bottom-row-grid">`;
     const bottomCharts = ['jurisdiction', 'age', 'normalized'];
     
@@ -73,10 +75,12 @@ window.buildDashboardGrid = function() {
     });
     bottomRowHtml += `</div>`;
     
+    // Inject constructed HTML back into the DOM
     grid.innerHTML = topRowHtml + bottomRowHtml;
 };
 
 window.ensureModalsExist = function() {
+    // Generate Data Table Modal if missing
     if (!document.getElementById('data-table-modal')) {
         const dataModalHtml = `
             <div id="data-table-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.6); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(2px);">
@@ -92,6 +96,7 @@ window.ensureModalsExist = function() {
         document.body.insertAdjacentHTML('beforeend', dataModalHtml);
     }
     
+    // Generate Enlarged Chart Modal if missing
     if (!document.getElementById('chart-modal')) {
         const chartModalHtml = `
             <div id="chart-modal" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(30, 41, 59, 0.7); z-index: 9999; justify-content: center; align-items: center; backdrop-filter: blur(2px);">
@@ -108,6 +113,7 @@ window.ensureModalsExist = function() {
     }
 };
 
+// Ensure modals are built as soon as the DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
     window.ensureModalsExist();
 });
@@ -118,11 +124,13 @@ window.openDataTableModal = function(chartId) {
     let data = [];
     const filters = window.getActiveFilters();
     
+    // Select correct dataset sub-module based on the requesting chart
     if (chartId === 'method') data = window.getFilteredData(window.rawDatasets.main, filters);
     else if (chartId === 'jurisdiction' || chartId === 'normalized') data = window.getFilteredData(window.rawDatasets.main, filters);
     else if (chartId === 'location') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
     else if (chartId === 'age') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
 
+    // Provide friendly fallback if filters yield no results
     if (!data || data.length === 0) {
         document.getElementById('data-table-title').innerText = config ? config.title : 'Data Table';
         document.getElementById('data-table-content').innerHTML = `<div style="display: flex; justify-content: center; align-items: center; height: 100%; color: #64748b; font-weight: bold; font-size: 15px;">No data available for the selected filters.</div>`;
@@ -161,6 +169,7 @@ window.openModal = function(chartId) {
     const config = window.chartConfigs.find(c => c.id === chartId);
     document.getElementById('modal-title').innerText = config ? config.title : 'Chart View';
     
+    // Inject clean canvas directly into modal
     const container = document.getElementById('modal-chart-container');
     container.innerHTML = `<canvas id="modal-canvas" style="display:none;"></canvas>`;
     
@@ -175,6 +184,7 @@ window.openModal = function(chartId) {
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
     
     let fLocation, fAge;
+    // Cross-reference data existence prior to rendering
     if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
@@ -183,6 +193,7 @@ window.openModal = function(chartId) {
         fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: ["0"]});
     }
 
+    // Delay execution slightly to ensure CSS Grid finishes resizing container before D3 math applies
     setTimeout(() => {
         if (chartId === 'method' && typeof renderDetectionChart === 'function') renderDetectionChart('modal-canvas', fDetection);
         if (chartId === 'jurisdiction' && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('modal-canvas', fJurisdiction);
@@ -196,6 +207,7 @@ window.fillSelect = function(elementId, items) {
     let select = document.getElementById(elementId);
     if (!select) return;
 
+    // Convert standard <select> node into <div> block to allow rich HTML injection
     if (select.tagName === 'SELECT') {
         const div = document.createElement('div'); div.id = elementId; div.className = select.className;
         select.parentNode.replaceChild(div, select); select = div;
@@ -204,6 +216,7 @@ window.fillSelect = function(elementId, items) {
     select.className = 'custom-checkbox-dropdown';
     select.style.position = 'relative'; select.style.width = '100%'; select.style.minWidth = '160px'; select.style.userSelect = 'none';
 
+    // Inject complex dropdown UI containing header and togglable list
     select.innerHTML = `
         <div class="dropdown-header" style="padding: 8px 12px; border: 1px solid #cbd5e1; border-radius: 6px; background: #fff; cursor: pointer; display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: #334155;">
             <span class="dropdown-text" style="font-weight: 500;">All</span><span style="font-size: 9px; color: #64748b;">▼</span>
@@ -220,24 +233,29 @@ window.fillSelect = function(elementId, items) {
         </div>
     `;
 
+    // Map DOM elements for interaction logic
     const header = select.querySelector('.dropdown-header'); const list = select.querySelector('.dropdown-list');
     const allCheckbox = select.querySelector('.filter-checkbox-all'); const itemCheckboxes = select.querySelectorAll('.filter-checkbox-item'); const textSpan = select.querySelector('.dropdown-text');
 
+    // UI Event Listeners
     header.addEventListener('click', (e) => { e.stopPropagation(); document.querySelectorAll('.dropdown-list').forEach(l => { if (l !== list) l.style.display = 'none'; }); list.style.display = list.style.display === 'none' ? 'block' : 'none'; });
     list.addEventListener('click', (e) => { e.stopPropagation(); });
     document.addEventListener('click', () => { list.style.display = 'none'; });
 
+    // State update handler triggered when any checkbox changes state
     const handleChange = () => {
         updateHeaderText();
         if (typeof window.renderDashboardCharts === 'function') window.renderDashboardCharts();
     };
 
+    // Auto-toggles sub-items if 'All' is manually manipulated
     allCheckbox.addEventListener('change', () => {
         if (allCheckbox.checked) itemCheckboxes.forEach(cb => cb.checked = false);
         else { const anyChecked = Array.from(itemCheckboxes).some(i => i.checked); if (!anyChecked) allCheckbox.checked = true; }
         handleChange();
     });
 
+    // Auto-toggles 'All' if sub-items are manually manipulated
     itemCheckboxes.forEach(cb => {
         cb.addEventListener('change', () => {
             if (cb.checked) allCheckbox.checked = false;

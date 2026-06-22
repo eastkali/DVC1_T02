@@ -24,6 +24,7 @@ function renderDetectionChart(canvasId, dataset) {
     const isSingleYear = selectedYears.length === 1; 
     const isSingleMethod = selectedMethods.length === 1; 
     
+    // Core display flags
     const useDonutChart = isSingleYear;
     const useBarChart = !isSingleYear && isSingleMethod;
 
@@ -33,6 +34,7 @@ function renderDetectionChart(canvasId, dataset) {
     const wrapper = container.append('div').attr('class', 'd3-svg-wrapper').style('position', 'relative').style('width', '100%').style('height', '100%');
     const svg = wrapper.append('svg').style('width', '100%').style('height', '100%').style('overflow', 'visible');
 
+    // Tooltip styled for dark mode and vertically centered positioning
     let tooltip = d3.select('body').selectAll('.d3-tooltip').data([0]).join('div').attr('class', 'd3-tooltip')
         .style('position', 'absolute')
         .style('background', 'rgba(15, 23, 42, 0.8)')
@@ -56,6 +58,7 @@ function renderDetectionChart(canvasId, dataset) {
         if (cw === 0 || ch === 0) return;
         svg.selectAll('*').remove();
 
+        // --- ACCESSIBILITY PATTERNS ---
         const defs = svg.append('defs');
         const getPatternFill = (cat) => {
             const idx = allMethods.indexOf(cat);
@@ -133,6 +136,7 @@ function renderDetectionChart(canvasId, dataset) {
         };
 
         if (useDonutChart) {
+            // --- SINGLE YEAR: DONUT CHART ---
             const dataPoints = allMethods.map(m => {
                 const matches = dataset.filter(r => r[methodKey]?.toString().trim() === m && r[yearKey]?.toString().trim() === selectedYears[0]);
                 return { label: m, value: matches.reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0), f: matches.reduce((s, r) => s + (parseFloat(r[finesKey]) || 0), 0), a: matches.reduce((s, r) => s + (parseFloat(r[arrestsKey]) || 0), 0), c: matches.reduce((s, r) => s + (parseFloat(r[chargesKey]) || 0), 0), seriesKey: m };
@@ -148,9 +152,11 @@ function renderDetectionChart(canvasId, dataset) {
 
             const pie = d3.pie().value(d => d.value).sort(null);
             
+            // Define main slice radius and outer label positioning radius
             const arc = d3.arc().innerRadius(radius * 0.5).outerRadius(radius * 0.75);
             const outerArc = d3.arc().innerRadius(radius * 0.85).outerRadius(radius * 0.85);
 
+            // Draw core donut slices
             gPie.selectAll('path').data(pie(dataPoints)).enter().append('path')
                 .attr('class', 'donut-arc').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
                 .attr('d', arc).attr('fill', d => getPatternFill(d.data.seriesKey))
@@ -183,6 +189,7 @@ function renderDetectionChart(canvasId, dataset) {
 
             const midAngle = d => d.startAngle + (d.endAngle - d.startAngle) / 2;
 
+            // Draw polylines connecting slices to text labels
             gPie.selectAll('polyline').data(pie(dataPoints)).enter().append('polyline')
                 .attr('class', 'slice-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('points', d => {
@@ -194,6 +201,7 @@ function renderDetectionChart(canvasId, dataset) {
                 })
                 .style('fill', 'none').style('stroke', '#94a3b8').style('stroke-width', 1);
 
+            // Draw external text labels with percentage calculations
             gPie.selectAll('text.slice-label-text').data(pie(dataPoints)).enter().append('text')
                 .attr('class', 'slice-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('transform', d => {
@@ -211,12 +219,14 @@ function renderDetectionChart(canvasId, dataset) {
                     return `${d.data.value.toLocaleString()} (${pct}%)`; 
                 });
 
+            // Center total summary text
             gPie.append("text").attr("text-anchor", "middle").attr("dy", "-0.2em").style("font-size", "13px").style("fill", "#64748b").style("font-family", "sans-serif").text("Total");
             gPie.append("text").attr("text-anchor", "middle").attr("dy", "1.1em").style("font-size", "22px").style("font-weight", "bold").style("fill", "#1e293b").style("font-family", "sans-serif").text(totalVal.toLocaleString());
             
             if (!isSingleMethod) drawLegend();
 
         } else if (useBarChart) {
+            // --- SINGLE METHOD: BAR CHART ---
             const method = selectedMethods[0];
             const labels = selectedYears;
             const dataPoints = labels.map(lbl => {
@@ -233,11 +243,13 @@ function renderDetectionChart(canvasId, dataset) {
             g.append('g').attr('transform', `translate(0,${height})`).call(d3.axisBottom(x)).selectAll("text").attr("transform", "translate(-10,0)rotate(-45)").style("text-anchor", "end");
             g.append('g').call(d3.axisLeft(y));
 
+            // Static background bars
             g.selectAll('rect.bar-item').data(dataPoints).enter().append('rect')
                 .attr('class', 'bar-item').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('x', d => x(d.label)).attr('y', d => y(d.value)).attr('width', x.bandwidth()).attr('height', d => height - y(d.value))
                 .attr('fill', d => colorScale(d.seriesKey));
 
+            // Transparent overlay for smooth full-column hovering interaction
             g.append('rect')
                 .attr('width', width)
                 .attr('height', height)
@@ -290,7 +302,8 @@ function renderDetectionChart(canvasId, dataset) {
             
             if (!isSingleMethod) drawLegend();
 
-        } else { 
+        } else {
+            // --- MULTI-YEAR: STACKED AREA CHART ---
             const stackData = selectedYears.map(year => {
                 const row = { year: year };
                 selectedMethods.forEach(m => { row[m] = dataset.filter(r => r[yearKey] == year && r[methodKey] == m).reduce((s, r) => s + (parseFloat(r[offenseKey]) || 0), 0); });
@@ -310,6 +323,7 @@ function renderDetectionChart(canvasId, dataset) {
 
             const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
 
+            // Data dots rendered underneath the paths
             areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
                 .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
                 .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3) 
@@ -324,6 +338,7 @@ function renderDetectionChart(canvasId, dataset) {
                     const pointer = d3.pointer(event, this); 
                     const closestYear = selectedYears.reduce((prev, curr) => Math.abs(x(curr) - pointer[0]) < Math.abs(x(prev) - pointer[0]) ? curr : prev); 
 
+                    // Enlarge the dots at the closest year step
                     g.selectAll('.data-dot')
                      .attr('r', dotData => {
                          if (dotData.data.year === closestYear) return dotData.key === d.key ? 7 : 5;
@@ -363,6 +378,7 @@ function renderDetectionChart(canvasId, dataset) {
                     d3.select(this).style('opacity', null); 
                     applyHighlight(); 
                     
+                    // Reset dots to static baseline
                     g.selectAll('.data-dot').attr('r', 3).style('stroke-width', 1.5);
                     
                     tooltip.style('opacity', 0); 

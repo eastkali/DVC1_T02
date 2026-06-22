@@ -22,6 +22,7 @@ function renderJurisdictionChart(canvasId, dataset) {
 
     const getValue = (row) => parseFloat(row[Object.keys(row).find(key => key.toLowerCase().includes('offense') || key.toLowerCase().includes('count') || key.toLowerCase().includes('total'))]) || 0;
 
+    // --- ACCESSIBILITY CONFIGURATION ---
     const customX = {
         draw(context, size) {
             const r = Math.sqrt(size) * 0.6;
@@ -117,6 +118,7 @@ function renderJurisdictionChart(canvasId, dataset) {
         };
 
         if (useBarChart) {
+            // --- SINGLE YEAR/CATEGORY: BAR CHART ---
             const labels = isSingleYear ? selectedJuris : selectedYears;
             const activeKey = isSingleYear ? yearKey : jurisKey;
             const activeVal = isSingleYear ? selectedYears[0] : selectedJuris[0];
@@ -208,6 +210,7 @@ function renderJurisdictionChart(canvasId, dataset) {
                 .text(d => d.value.toLocaleString());
 
         } else {
+            // --- MULTI-YEAR: LINE CHART ---
             const x = d3.scalePoint().domain(selectedYears).range([0, width]);
             let maxVal = 0;
             const lineData = selectedJuris.map(juris => {

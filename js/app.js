@@ -1,6 +1,7 @@
 window.currentTopic = ''; 
 window.rawDatasets = {};
 
+// Standard accessibility-friendly color and shape palettes
 window.okabeItoColors = ['#009E73', '#E69F00', '#D55E00', '#0072B2', '#CC79A7', '#F0E442', '#000000'];
 window.pointShapes = ['circle', 'rect', 'star', 'triangle', 'rectRot', 'cross', 'crossRot'];
 
@@ -16,6 +17,7 @@ window.checkDataAndToggle = function(chartId, data) {
     const container = canvas.parentElement;
     let noDataMsg = container.querySelector('.no-data-overlay');
     
+    // Create the overlay dynamically if it doesn't exist
     if (!noDataMsg) {
         noDataMsg = document.createElement('div');
         noDataMsg.className = 'no-data-overlay';
@@ -40,6 +42,7 @@ window.checkDataAndToggle = function(chartId, data) {
         container.appendChild(noDataMsg);
     }
 
+    // Toggle visibility based on data presence
     if (!data || data.length === 0) {
         noDataMsg.style.display = 'flex';
         canvas.style.display = 'none'; 
@@ -55,6 +58,7 @@ window.checkDataAndToggle = function(chartId, data) {
     }
 };
 
+// Global listener to close custom dropdowns when clicking outside
 document.addEventListener('click', () => {
     document.querySelectorAll('.dropdown-list').forEach(list => {
         list.style.display = 'none';
@@ -119,6 +123,7 @@ window.getActiveFilters = function() {
 
         const allItems = el.querySelectorAll('.filter-checkbox-item');
         const checkedItems = el.querySelectorAll('.filter-checkbox-item:checked');
+        // If all sub-items are manually checked, treat it as "all"
         if (allItems.length > 0 && allItems.length === checkedItems.length) {
             return ['all'];
         }
@@ -142,12 +147,14 @@ window.getFilteredData = function(dataArray, filters) {
     return dataArray.filter(row => {
         const keys = Object.keys(row);
         
+        // Dynamically find correct object keys handling capitalization mismatches
         const yearKey = keys.find(k => k.toLowerCase() === 'year');
         const jurisKey = keys.find(k => k.toLowerCase() === 'jurisdiction');
         const locKey = keys.find(k => k.toLowerCase() === 'location');
         const ageKey = keys.find(k => k.toLowerCase().includes('age'));
         const methodKey = keys.find(k => k.toLowerCase().includes('method') || k.toLowerCase().includes('detect'));
 
+        // Apply strict intersection filtering (must pass ALL rules to be included)
         if (filters.year && !filters.year.includes('all')) {
             if (!yearKey || !filters.year.includes(row[yearKey].toString().trim())) return false;
         }
@@ -171,6 +178,7 @@ window.getFilteredData = function(dataArray, filters) {
 window.loadTopicData = function(topic) {
     if (!topic || topic === 'home') return;
 
+    // Parse topic to match file naming conventions
     let prefix = topic; 
     if (topic.includes('seatbelt') || topic === 's') prefix = 's';
     if (topic.includes('mobile') || topic === 'mp') prefix = 'mp';
@@ -180,8 +188,10 @@ window.loadTopicData = function(topic) {
         d3.csv(`data/${prefix}_main.csv`),
         d3.csv(`data/${prefix}_loc_age.csv`)  
     ]).then(([license, main, loc_age]) => {
+        // Cache datasets globally to avoid refetching on filter changes
         window.rawDatasets = { license, main, loc_age };
 
+        // Generate filter UI and draw initial charts
         if(typeof window.populateDynamicDropdowns === 'function') window.populateDynamicDropdowns();
         window.renderDashboardCharts();
     }).catch(err => {
@@ -193,12 +203,14 @@ window.populateDynamicDropdowns = function() {
     const ds = window.rawDatasets;
     if (!ds.main) return;
 
+    // Utilize Sets to ensure all values are unique, then sort appropriately
     const years = [...new Set(ds.main.map(d => d.YEAR))].sort((a,b)=>b-a);
     const locations = [...new Set(ds.loc_age.map(d => d.LOCATION))].sort();
     const ages = [...new Set(ds.loc_age.map(d => d.AGE_GROUP))].sort();
     const methods = [...new Set(ds.main.map(d => d.DETECTION_METHOD))].sort();
     const jurisdictions = [...new Set(ds.main.map(d => d.JURISDICTION))].sort();
     
+    // Pass extracted arrays to the UI generator
     if(typeof window.fillSelect === 'function') {
         window.fillSelect('filter-year', years);
         window.fillSelect('filter-location', locations);
@@ -215,6 +227,7 @@ window.renderDashboardCharts = function() {
     const yearsWithLocAge = [...new Set(window.rawDatasets.loc_age.map(d => d.YEAR))].sort((a,b)=>b-a);
     const masterYearsSetWithLocAge = new Set(yearsWithLocAge);
 
+    // Apply active filters to specific data modules
     const fJurisdiction = window.getFilteredData(window.rawDatasets.main, filters);
     const fDetection = window.getFilteredData(window.rawDatasets.main, filters);
     const fLicense = window.getFilteredData(window.rawDatasets.license, filters);
@@ -222,25 +235,30 @@ window.renderDashboardCharts = function() {
     let fLocation = [];
     let fAge = [];
     
+    // Prevent location/age charts from breaking if a year is selected that doesn't exist in their specific sub-dataset
     if (filters.year.includes('all') || filters.year.every(y => masterYearsSetWithLocAge.has(y))){
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, filters);
         fAge = window.getFilteredData(window.rawDatasets.loc_age, filters);
     } else {
+        // Feed empty data to trigger the clean "No Data" overlay
         fLocation = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
         fAge = window.getFilteredData(window.rawDatasets.loc_age, {year: "0"});
     }
 
+    // Trigger explicit D3 render calls safely
     if (window.checkDataAndToggle('chart-method', fDetection) && typeof renderDetectionChart === 'function') renderDetectionChart('chart-method', fDetection);
     if (window.checkDataAndToggle('chart-jurisdiction', fJurisdiction) && typeof renderJurisdictionChart === 'function') renderJurisdictionChart('chart-jurisdiction', fJurisdiction);
     if (window.checkDataAndToggle('chart-location', fLocation) && typeof renderLocationChart === 'function') renderLocationChart('chart-location', fLocation);
     if (window.checkDataAndToggle('chart-age', fAge) && typeof renderAgeGroupChart === 'function') renderAgeGroupChart('chart-age', fAge);
     if (window.checkDataAndToggle('chart-normalized', fLicense) && typeof renderNormalizedChart === 'function') renderNormalizedChart('chart-normalized', fLicense);
     
+    // Update top KPI widgets
     const kpiContainer = document.getElementById('offenseLevelKpiContainer');
     if (kpiContainer) {
         
-        let activeKpiData = []; // <--- THIS FIXES THE CRASH
+        let activeKpiData = [];
 
+        // Determine which dataset is the most "populated" to use for accurate KPI summation
         if (fJurisdiction && fJurisdiction.length > 0) activeKpiData = fJurisdiction;
         else if (fDetection && fDetection.length > 0) activeKpiData = fDetection;
         else if (fLocation && fLocation.length > 0) activeKpiData = fLocation;
@@ -251,15 +269,19 @@ window.renderDashboardCharts = function() {
         } else {
             if (typeof renderOffenseLevelKpi === 'function') {
                 renderOffenseLevelKpi('offenseLevelKpiContainer', activeKpiData);
+                // Regex cleanup to remove any stray currency symbols that may have leaked from standard formatting
                 kpiContainer.innerHTML = kpiContainer.innerHTML.replace(/\$/g, '');
             }
         }
     }
 
+    // Delay interaction enforcement slightly to allow D3 transitions to initialize
     setTimeout(window.enforceInteractiveHighlight, 150);
 };
 
+// --- INITIALIZATION AND EVENT BINDING ---
 window.onload = function() {
+    // Generate dashboard UI and hidden modals upon load
     if(typeof window.buildDashboardGrid === 'function') window.buildDashboardGrid(); 
     if(typeof window.injectDataTableModal === 'function') window.injectDataTableModal(); 
 
@@ -267,6 +289,7 @@ window.onload = function() {
     
     if (topicMenu) {
         
+        // Main Navigation Routing Logic
         topicMenu.addEventListener('click', (e) => {
             if (!e.target.classList.contains('nav-btn')) return;
             document.querySelectorAll('#topic-menu .nav-btn').forEach(b => b.classList.remove('active'));
@@ -281,11 +304,13 @@ window.onload = function() {
                 if (homeView) homeView.style.display = 'flex';
                 if (dashView) dashView.style.display = 'none';
             } else {
+                // Switch to active dashboard view
                 const homeView = document.getElementById('home-view');
                 const dashView = document.getElementById('dashboard-view');
                 if (homeView) homeView.style.display = 'none';
                 if (dashView) dashView.style.display = 'block';
                 
+                // Clear all filters when switching to a completely new topic
                 document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
                     const allCb = dropdown.querySelector('.filter-checkbox-all');
                     const items = dropdown.querySelectorAll('.filter-checkbox-item');
@@ -300,11 +325,14 @@ window.onload = function() {
             }
         });
     }
+
+    // Bind main rendering engine to any filter state changes
     const filtersContainer = document.querySelector('.filters-container');
     filtersContainer.addEventListener('change', (event) => {
         window.renderDashboardCharts();
     });
     
+    // Bind Reset button logic
     document.getElementById('reset-view-btn').addEventListener('click', () => {
         document.querySelectorAll('.custom-checkbox-dropdown').forEach(dropdown => {
             const allCb = dropdown.querySelector('.filter-checkbox-all');
