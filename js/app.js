@@ -325,12 +325,6 @@ window.onload = function() {
             }
         });
     }
-
-    // Bind main rendering engine to any filter state changes
-    const filtersContainer = document.querySelector('.filters-container');
-    filtersContainer.addEventListener('change', (event) => {
-        window.renderDashboardCharts();
-    });
     
     // Bind Reset button logic
     document.getElementById('reset-view-btn').addEventListener('click', () => {
@@ -344,8 +338,4 @@ window.onload = function() {
         });
         window.renderDashboardCharts();
     });
-
-    // document.getElementById('close-modal-btn').addEventListener('click', () => {
-    //     document.getElementById('chart-modal').style.display = 'none';
-    // });
 };

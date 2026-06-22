@@ -124,13 +124,6 @@ window.openDataTableModal = function(chartId) {
     let data = [];
     const filters = window.getActiveFilters();
     
-<<<<<<< HEAD
-    // Select correct dataset sub-module based on the requesting chart
-    if (chartId === 'method') data = window.getFilteredData(window.rawDatasets.main, filters);
-    else if (chartId === 'jurisdiction' || chartId === 'normalized') data = window.getFilteredData(window.rawDatasets.main, filters);
-    else if (chartId === 'location') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
-    else if (chartId === 'age') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
-=======
     if (chartId === 'method') {
         rawData = window.getFilteredData(window.rawDatasets.main, filters);
         data = d3.flatRollup(          
@@ -243,7 +236,6 @@ window.openDataTableModal = function(chartId) {
             Charges: metrics.charges,
         }));
     }
->>>>>>> 08494951543bd942506e870b9fbf8788ff438dbf
 
     // Provide friendly fallback if filters yield no results
     if (!data || data.length === 0) {

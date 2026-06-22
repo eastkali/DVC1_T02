@@ -323,11 +323,7 @@ function renderDetectionChart(canvasId, dataset) {
 
             const areas = g.selectAll('.area-group').data(stack).enter().append('g').attr('class', 'area-group');
 
-            // Data dots rendered underneath the paths
-            areas.selectAll('.data-dot').data(d => d.map(p => ({...p, key: d.key}))).enter().append('circle')
-                .attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none') 
-                .attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3) 
-                .attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
+            const dataDots = g.selectAll('.data-dot').data(stack.flatMap(d => d.map(p => ({...p, key: d.key})))).enter().append('circle').attr('class', 'data-dot').style('transition', 'all 0.15s ease-out').style('pointer-events', 'none').attr('cx', d => x(d.data.year)).attr('cy', d => y(d[1])).attr('r', 3).attr('fill', d => colorScale(d.key)).style('stroke', '#fff').style('stroke-width', 1.5);
 
             areas.append('path')
                 .attr('class', 'area-path').style('transition', 'opacity 0.2s').style('cursor', 'pointer')
