@@ -287,14 +287,11 @@ function renderAgeGroupChart(canvasId, dataset) {
                         </div>`;
                     });
 
-                    tooltip.style('opacity', 1).html(html);
-                    const tipHeight = tooltip.node().offsetHeight;
-                    tooltip.style('left', (event.pageX + 15) + 'px').style('top', (event.pageY - (tipHeight / 2)) + 'px');
+                    tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', event.pageY + 'px');
                 }).on('mouseout', function(event, d) { 
-                    g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.age)).size(50)()); 
+                    g.selectAll('.dot').attr('d', dotData => d3.symbol().type(shapeScale(dotData.juris)).size(50)()); 
                     tooltip.style('opacity', 0); 
-                }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.age); });
-
+                }).on('click', (event, d) => { event.stopPropagation(); toggleHighlight(d.juris); });
             drawLegend(); 
         }
         applyHighlight(); 
