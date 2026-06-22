@@ -124,11 +124,126 @@ window.openDataTableModal = function(chartId) {
     let data = [];
     const filters = window.getActiveFilters();
     
+<<<<<<< HEAD
     // Select correct dataset sub-module based on the requesting chart
     if (chartId === 'method') data = window.getFilteredData(window.rawDatasets.main, filters);
     else if (chartId === 'jurisdiction' || chartId === 'normalized') data = window.getFilteredData(window.rawDatasets.main, filters);
     else if (chartId === 'location') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
     else if (chartId === 'age') data = window.getFilteredData(window.rawDatasets.loc_age, filters);
+=======
+    if (chartId === 'method') {
+        rawData = window.getFilteredData(window.rawDatasets.main, filters);
+        data = d3.flatRollup(          
+            rawData,
+            v => ({
+                offenses: d3.sum(v, d => parseFloat(d.OFFENSES_SUM) || 0),
+                fines: d3.sum(v, d => parseFloat(d.FINES) || 0),
+                arrests: d3.sum(v, d => parseFloat(d.ARRESTS) || 0),
+                charges: d3.sum(v, d => parseFloat(d.CHARGES) || 0),
+            }),
+            d => d.YEAR,    
+            d => d.DETECTION_METHOD  
+        ).map(([year, method, metrics]) => ({
+            Year: year,
+            Method: method,
+            Offenses_sum: metrics.offenses,
+            Fines: metrics.fines,
+            Arrests: metrics.arrests,
+            Charges: metrics.charges,
+        }));
+    }       
+    else if (chartId === 'jurisdiction') {
+        rawData = window.getFilteredData(window.rawDatasets.main, filters);
+
+        data = d3.flatRollup(        
+            rawData,
+            v => ({
+                offenses: d3.sum(v, d => parseFloat(d.OFFENSES_SUM) || 0),
+                fines: d3.sum(v, d => parseFloat(d.FINES) || 0),
+                arrests: d3.sum(v, d => parseFloat(d.ARRESTS) || 0),
+                charges: d3.sum(v, d => parseFloat(d.CHARGES) || 0),
+            }),
+            d => d.YEAR,    
+            d => d.JURISDICTION  
+        ).map(([year, jurisdiction, metrics]) => ({
+            Year: year,
+            Jursidiction: jurisdiction,
+            Offenses_sum: metrics.offenses,
+            Fines: metrics.fines,
+            Arrests: metrics.arrests,
+            Charges: metrics.charges,
+        }));
+    }
+    else if (chartId === 'location') {
+        rawData = window.getFilteredData(window.rawDatasets.loc_age, filters);
+        data = d3.flatRollup(        
+            rawData,
+            v => ({
+                offenses: d3.sum(v, d => parseFloat(d.OFFENSES_SUM) || 0),
+                fines: d3.sum(v, d => parseFloat(d.FINES) || 0),
+                arrests: d3.sum(v, d => parseFloat(d.ARRESTS) || 0),
+                charges: d3.sum(v, d => parseFloat(d.CHARGES) || 0),
+            }),
+            d => d.YEAR,    
+            d => d.LOCATION  
+        ).map(([year, location, metrics]) => ({
+            Year: year,
+            Location: location,
+            Offenses_sum: metrics.offenses,
+            Fines: metrics.fines,
+            Arrests: metrics.arrests,
+            Charges: metrics.charges,
+        }));
+    }
+    else if (chartId === 'age') {
+        rawData = window.getFilteredData(window.rawDatasets.loc_age, filters);
+
+        data = d3.flatRollup(        
+            rawData,
+            v => ({
+                offenses: d3.sum(v, d => parseFloat(d.OFFENSES_SUM) || 0),
+                fines: d3.sum(v, d => parseFloat(d.FINES) || 0),
+                arrests: d3.sum(v, d => parseFloat(d.ARRESTS) || 0),
+                charges: d3.sum(v, d => parseFloat(d.CHARGES) || 0),
+            }),
+            d => d.YEAR,    
+            d => d.AGE_GROUP  
+        ).map(([year, age, metrics]) => ({
+            Year: year,
+            Age_group: age,
+            Offenses_sum: metrics.offenses,
+            Fines: metrics.fines,
+            Arrests: metrics.arrests,
+            Charges: metrics.charges,
+        }));
+    }
+    else if (chartId === 'normalized') {
+        rawData = window.getFilteredData(window.rawDatasets.license, filters);
+        console.table(rawData[0]);
+        data = d3.flatRollup(        
+            rawData,
+            v => ({
+                offenses: d3.sum(v, d => parseFloat(d["OFFENSES_SUM (Sum)"]) || 0),
+                fines: d3.sum(v, d => parseFloat(d["FINES (Sum)"]) || 0),
+                arrests: d3.sum(v, d => parseFloat(d["ARRESTS (Sum)"]) || 0),
+                charges: d3.sum(v, d => parseFloat(d["CHARGES (Sum)"]) || 0),
+            }),
+            d => d.YEAR, 
+            d => d.JURISDICTION,  
+            d => d.Total, 
+            d => d.COUNT_PER_10K  
+        ).map(([year, jurisdiction, total, rate, metrics]) => ({
+            Year: year,
+            Jursidiction: jurisdiction,
+            Total_license_holders: total,
+            Offense_rates: rate,
+            Offenses_sum: metrics.offenses,
+            Fines: metrics.fines,
+            Arrests: metrics.arrests,
+            Charges: metrics.charges,
+        }));
+    }
+>>>>>>> 08494951543bd942506e870b9fbf8788ff438dbf
 
     // Provide friendly fallback if filters yield no results
     if (!data || data.length === 0) {
@@ -156,7 +271,7 @@ window.openDataTableModal = function(chartId) {
         </table>
     `;
 
-    document.getElementById('data-table-title').innerText = config ? config.title + ' (Raw Data)' : 'Data Table';
+    document.getElementById('data-table-title').innerText = config ? config.title : 'Data Table';
     document.getElementById('data-table-content').innerHTML = tableHtml;
     document.getElementById('data-table-modal').style.display = 'flex';
 };
