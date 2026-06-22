@@ -182,7 +182,7 @@ function renderNormalizedChart(canvasId, dataset) {
                                 <span>${d.seriesKey} (${isSingleYear ? activeVal : d.label})</span>
                             </div>
                         </div>
-                        <div style="font-size: 11px;">Rate (Per 10k): <strong>${d.value.toFixed(2)}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}</div>
+                        <div style="font-size: 11px;">Rate (Per 10k): <strong>${d.value.toLocaleString()}</strong><br>• Fines: ${d.f.toLocaleString()}<br>• Arrests: ${d.a.toLocaleString()}<br>• Charges: ${d.c.toLocaleString()}<br>• Licenses: ${d.l.toLocaleString()}</div>
                     `;
                     tooltip.style('opacity', 1).html(html).style('left', (event.pageX + 15) + 'px').style('top', event.pageY + 'px');
                 }).on('mouseout', function() { 
@@ -208,7 +208,7 @@ function renderNormalizedChart(canvasId, dataset) {
                 .attr('transform', d => `translate(${x(d.label) + x.bandwidth() / 2}, ${y(d.value) - 8}) rotate(-90)`)
                 .style('font-size', '11px').style('fill', '#334155').style('font-weight', '600').style('font-family', 'sans-serif')
                 .attr('text-anchor', 'start').attr('alignment-baseline', 'middle')
-                .text(d => d.value.toFixed(2));
+                .text(d => d.value.toLocaleString());
 
         } else {
             // --- MULTI-YEAR: LINE CHART ---
@@ -271,7 +271,7 @@ function renderNormalizedChart(canvasId, dataset) {
                                 </svg>
                                 <span>${item.juris}</span>
                             </div>
-                            <strong>${item.val.toFixed(2)}</strong>
+                            <strong>${item.val.toLocaleString()}</strong>
                         </div>`;
                     });
 
