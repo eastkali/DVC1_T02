@@ -196,7 +196,7 @@ function renderDetectionChart(canvasId, dataset) {
                     const posA = arc.centroid(d);
                     const posB = outerArc.centroid(d);
                     const posC = [...posB];
-                    posC[0] = radius * 0.9 * (midAngle(d) < Math.PI ? 1 : -1);
+                    posC[0] = radius * 0.5 * (midAngle(d) < Math.PI ? 1 : -1);
                     return [posA, posB, posC];
                 })
                 .style('fill', 'none').style('stroke', '#94a3b8').style('stroke-width', 1);
@@ -206,7 +206,7 @@ function renderDetectionChart(canvasId, dataset) {
                 .attr('class', 'slice-label').style('transition', 'opacity 0.2s').style('pointer-events', 'none')
                 .attr('transform', d => {
                     const pos = outerArc.centroid(d);
-                    pos[0] = radius * 0.95 * (midAngle(d) < Math.PI ? 1 : -1);
+                    pos[0] = radius * 0.6 * (midAngle(d) < Math.PI ? 1 : -1);
                     return `translate(${pos})`;
                 })
                 .style('text-anchor', d => midAngle(d) < Math.PI ? 'start' : 'end')
